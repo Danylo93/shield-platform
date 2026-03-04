@@ -70,6 +70,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   const canProceedConfig = owner.trim();
 
   const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
+    { key: "project", label: "Projeto", icon: <FolderOpen className="h-4 w-4" /> },
     { key: "info", label: "Informações", icon: <Box className="h-4 w-4" /> },
     { key: "config", label: "Configuração", icon: <GitBranch className="h-4 w-4" /> },
     { key: "review", label: "Revisão", icon: <CheckCircle2 className="h-4 w-4" /> },
