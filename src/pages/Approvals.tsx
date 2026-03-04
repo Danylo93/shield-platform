@@ -39,6 +39,16 @@ export default function Approvals() {
         .select("*")
         .order("created_at", { ascending: false });
       if (error) throw error;
+
+      // Fetch creator names
+      const creatorIds = [...new Set((data || []).map((c: any) => c.created_by))];
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", creatorIds);
+      
+      const profileMap = Object.fromEntries((profiles || []).map((p: any) => [p.id, p.full_name]));
+      return (data || []).map((c: any) => ({ ...c, creator_name: profileMap[c.created_by] || "" }));
       return data;
     },
   });
@@ -211,7 +221,13 @@ export default function Approvals() {
                     <p className="text-xs text-muted-foreground truncate">
                       {comp.project_name} • {new Date(comp.created_at).toLocaleDateString("pt-BR")}
                       {comp.squad && ` • ${comp.squad}`}
+                      {comp.creator_name && ` • Dev: ${comp.creator_name}`}
                     </p>
+                    {comp.rifc && (
+                      <p className="text-xs text-primary font-mono">
+                        RIFC: {comp.rifc}
+                      </p>
+                    )}
                   </div>
                   <Badge variant="outline" className={`gap-1 ${status.color}`}>
                     {isCreating ? (
