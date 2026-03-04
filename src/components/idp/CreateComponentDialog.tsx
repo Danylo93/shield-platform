@@ -93,7 +93,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
-      <DialogContent className="sm:max-w-xl glass">
+      <DialogContent className="sm:max-w-2xl w-[95vw] glass">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
