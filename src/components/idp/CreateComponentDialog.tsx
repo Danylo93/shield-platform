@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Template, languageLabels } from "@/data/templates";
+import { projects, Project } from "@/data/projects";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Rocket, GitBranch, Box, CheckCircle2 } from "lucide-react";
+import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search } from "lucide-react";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CreateComponentDialogProps {
   open: boolean;
