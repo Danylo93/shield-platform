@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAzureProjects, AzureProject, AzureTemplate } from "@/hooks/useAzureDevOps";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
   DialogContent,
@@ -14,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search, Loader2 } from "lucide-react";
+import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search, Loader2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -41,21 +43,38 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   const [description, setDescription] = useState("");
   const [owner, setOwner] = useState("");
   const [creating, setCreating] = useState(false);
+  const { user } = useAuth();
 
   const { data: projects, isLoading: loadingProjects } = useAzureProjects();
 
   if (!template) return null;
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
+    if (!user || !selectedProject) return;
     setCreating(true);
-    setTimeout(() => {
-      setCreating(false);
-      toast.success(`Componente "${componentName}" criado com sucesso!`, {
-        description: `Projeto: ${selectedProject?.name} • Repo: ${repoName} • Template: ${template.name}`,
+    try {
+      const { error } = await supabase.from("components").insert({
+        name: componentName,
+        description,
+        language: template.language,
+        template_id: template.id,
+        project_name: selectedProject.name,
+        repo_name: repoName,
+        created_by: user.id,
+        approval_status: "pending",
+      });
+      if (error) throw error;
+      toast.success(`Solicitação enviada para aprovação!`, {
+        description: `O componente "${componentName}" será criado após aprovação do DevOps.`,
+        icon: <Clock className="h-4 w-4" />,
       });
       onOpenChange(false);
       resetForm();
-    }, 2000);
+    } catch (err: any) {
+      toast.error("Erro ao solicitar criação", { description: err.message });
+    } finally {
+      setCreating(false);
+    }
   };
 
   const resetForm = () => {
@@ -97,7 +116,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
-            Criar Componente
+            Solicitar Componente
           </DialogTitle>
           <DialogDescription>
             Template: <span className="font-medium text-foreground">{template.name}</span>
@@ -221,7 +240,6 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 <div className="flex justify-between"><span className="text-muted-foreground">Componente</span><span className="font-medium">{componentName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Repositório</span><span className="font-mono text-xs">{repoName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span>{template.name} ({langLabels[template.language] || template.language})</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Path</span><span className="font-mono text-xs max-w-[12rem] sm:max-w-xs truncate text-right">{template.path}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Owner</span><span>{owner}</span></div>
                 {description && (
                   <div className="pt-2 border-t border-border">
@@ -230,13 +248,22 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                   </div>
                 )}
               </div>
+
+              <div className="rounded-lg bg-warning/5 border border-warning/20 p-3 flex items-start gap-2">
+                <Clock className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  Após enviar, a solicitação ficará <strong className="text-foreground">pendente de aprovação</strong> pelo time DevOps.
+                  O repositório será criado automaticamente após aprovação.
+                </p>
+              </div>
+
               <div className="flex justify-between">
                 <Button variant="ghost" onClick={() => setStep("config")}>Voltar</Button>
                 <Button onClick={handleCreate} disabled={creating} className="gap-2">
                   {creating ? (
-                    <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}><Rocket className="h-4 w-4" /></motion.div>Criando...</>
+                    <><Loader2 className="h-4 w-4 animate-spin" />Enviando...</>
                   ) : (
-                    <><Rocket className="h-4 w-4" />Criar Componente</>
+                    <><Rocket className="h-4 w-4" />Solicitar Criação</>
                   )}
                 </Button>
               </div>
