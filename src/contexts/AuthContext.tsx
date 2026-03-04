@@ -27,12 +27,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchUserData = async (userId: string) => {
-    const [profileRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("id, email, full_name").eq("id", userId).single(),
-      supabase.from("user_roles").select("role").eq("user_id", userId),
-    ]);
-    if (profileRes.data) setProfile(profileRes.data);
-    if (rolesRes.data) setRoles(rolesRes.data.map((r: any) => r.role as AppRole));
+    try {
+      const [profileRes, rolesRes] = await Promise.all([
+        supabase.from("profiles").select("id, email, full_name").eq("id", userId).maybeSingle(),
+        supabase.from("user_roles").select("role").eq("user_id", userId),
+      ]);
+      if (profileRes.data) setProfile(profileRes.data);
+      if (rolesRes.data) setRoles(rolesRes.data.map((r: any) => r.role as AppRole));
+    } catch (err) {
+      console.error("Error fetching user data:", err);
+    }
   };
 
   useEffect(() => {
