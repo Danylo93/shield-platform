@@ -29,6 +29,7 @@ export type Database = {
           rejection_reason: string | null
           repo_name: string | null
           repo_url: string | null
+          rifc: string
           squad: string
           template_id: string | null
           updated_at: string
@@ -47,6 +48,7 @@ export type Database = {
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
+          rifc?: string
           squad?: string
           template_id?: string | null
           updated_at?: string
@@ -65,6 +67,7 @@ export type Database = {
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
+          rifc?: string
           squad?: string
           template_id?: string | null
           updated_at?: string

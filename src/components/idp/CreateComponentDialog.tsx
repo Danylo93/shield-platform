@@ -39,6 +39,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   const [projectSearch, setProjectSearch] = useState("");
   const [componentName, setComponentName] = useState("");
   const [description, setDescription] = useState("");
+  const [rifc, setRifc] = useState("");
   const [creating, setCreating] = useState(false);
   const { user, profile } = useAuth();
 
@@ -57,6 +58,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
         template_id: template.id,
         project_name: selectedProject.name,
         repo_name: componentName,
+        rifc: rifc.trim(),
         created_by: user.id,
         squad: profile?.squad || "",
         approval_status: "pending",
@@ -81,6 +83,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
     setProjectSearch("");
     setComponentName("");
     setDescription("");
+    setRifc("");
   };
 
   const filteredProjects = (projects || []).filter((p) =>
@@ -88,7 +91,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
     (p.description || "").toLowerCase().includes(projectSearch.toLowerCase())
   );
 
-  const canProceedInfo = componentName.trim();
+  const canProceedInfo = componentName.trim() && rifc.trim();
 
   const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
     { key: "project", label: "Projeto", icon: <FolderOpen className="h-4 w-4" /> },
@@ -187,6 +190,11 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                   onChange={(e) => setComponentName(e.target.value)} className="mt-1.5" />
               </div>
               <div>
+                <Label htmlFor="rifc">Número do RIFC</Label>
+                <Input id="rifc" placeholder="RIFC-00000" value={rifc}
+                  onChange={(e) => setRifc(e.target.value)} className="mt-1.5" />
+              </div>
+              <div>
                 <Label htmlFor="desc">Descrição</Label>
                 <Textarea id="desc" placeholder="Descreva o propósito deste componente..." value={description}
                   onChange={(e) => setDescription(e.target.value)} className="mt-1.5 resize-none" rows={3} />
@@ -204,6 +212,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 <div className="flex justify-between"><span className="text-muted-foreground">Projeto</span><span className="font-medium">{selectedProject?.name}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Componente / Repo</span><span className="font-mono text-xs">{componentName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span>{template.name} ({langLabels[template.language] || template.language})</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">RIFC</span><span className="font-mono text-xs">{rifc}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Owner</span><span>argosolutions</span></div>
                 {description && (
                   <div className="pt-2 border-t border-border">
