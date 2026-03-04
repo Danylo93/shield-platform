@@ -27,19 +27,23 @@ serve(async (req) => {
   const authHeader = `Basic ${btoa(`:${AZURE_DEVOPS_PAT}`)}`;
   const baseUrl = `https://dev.azure.com/${AZURE_DEVOPS_ORG}`;
 
+  async function azureFetch(endpoint: string) {
+    const res = await fetch(endpoint, {
+      headers: { 'Authorization': authHeader },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Azure DevOps API error [${res.status}]: ${text}`);
+    }
+    return res.json();
+  }
+
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action') || 'projects';
 
     if (action === 'projects') {
-      const res = await fetch(`${baseUrl}/_apis/projects?api-version=7.1&$top=100`, {
-        headers: { 'Authorization': authHeader },
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Azure DevOps API error [${res.status}]: ${text}`);
-      }
-      const data = await res.json();
+      const data = await azureFetch(`${baseUrl}/_apis/projects?api-version=7.1&$top=100`);
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -50,21 +54,59 @@ serve(async (req) => {
       const endpoint = projectName
         ? `${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories?api-version=7.1`
         : `${baseUrl}/_apis/git/repositories?api-version=7.1`;
-
-      const res = await fetch(endpoint, {
-        headers: { 'Authorization': authHeader },
-      });
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Azure DevOps API error [${res.status}]: ${text}`);
-      }
-      const data = await res.json();
+      const data = await azureFetch(endpoint);
       return new Response(JSON.stringify(data), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action. Use: projects, repos' }), {
+    if (action === 'templates') {
+      const project = url.searchParams.get('project') || 'Devops';
+      const repo = url.searchParams.get('repo') || 'argo-code';
+      const path = url.searchParams.get('path') || '/base-argoit';
+      const branch = url.searchParams.get('branch') || 'main';
+
+      // Get items (folders) in the path
+      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(path)}&recursionLevel=OneLevel&api-version=7.1`;
+      const data = await azureFetch(itemsEndpoint);
+      
+      // For each language folder, get sub-items (template folders)
+      const items = data.value || [];
+      const languageFolders = items.filter((item: any) => item.isFolder && item.path !== path);
+      
+      const templates: any[] = [];
+      
+      for (const langFolder of languageFolders) {
+        const langName = langFolder.path.split('/').pop();
+        // Skip non-language folders like 'templates', 'tools', 'examples', 'variables'
+        if (!['dotnet', 'java', 'python'].includes(langName)) continue;
+        
+        // Get sub-templates inside each language folder
+        const subEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(langFolder.path)}&recursionLevel=OneLevel&api-version=7.1`;
+        const subData = await azureFetch(subEndpoint);
+        const subItems = subData.value || [];
+        
+        for (const item of subItems) {
+          if (item.isFolder && item.path !== langFolder.path) {
+            const templateName = item.path.split('/').pop();
+            templates.push({
+              id: item.objectId || `${langName}-${templateName}`,
+              name: templateName,
+              language: langName,
+              path: item.path,
+              repoName: repo,
+              project: project,
+            });
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ value: templates }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Invalid action. Use: projects, repos, templates' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {

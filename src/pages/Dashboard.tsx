@@ -1,33 +1,32 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Layers, GitFork, Users, Activity, Plus, ArrowRight, Loader2 } from "lucide-react";
-import { templates } from "@/data/templates";
+import { Layers, GitFork, Users, Activity, Plus, ArrowRight } from "lucide-react";
 import { TemplateCard } from "@/components/idp/TemplateCard";
 import { CreateComponentDialog } from "@/components/idp/CreateComponentDialog";
 import { StatsCard } from "@/components/idp/StatsCard";
 import { Button } from "@/components/ui/button";
-import { Template } from "@/data/templates";
 import { useNavigate } from "react-router-dom";
-import { useAzureRepos, useAzureProjects } from "@/hooks/useAzureDevOps";
+import { useAzureRepos, useAzureProjects, useAzureTemplates, AzureTemplate } from "@/hooks/useAzureDevOps";
+import { Loader2 } from "lucide-react";
 
 export default function Dashboard() {
-  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<AzureTemplate | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useNavigate();
 
   const { data: repos } = useAzureRepos();
   const { data: projects } = useAzureProjects();
+  const { data: templates, isLoading: loadingTemplates } = useAzureTemplates();
 
-  const handleUseTemplate = (template: Template) => {
+  const handleUseTemplate = (template: AzureTemplate) => {
     setSelectedTemplate(template);
     setDialogOpen(true);
   };
 
-  const featuredTemplates = templates.slice(0, 4);
+  const featuredTemplates = (templates || []).slice(0, 4);
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-8">
-      {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -62,15 +61,13 @@ export default function Dashboard() {
         </motion.div>
       </motion.div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard title="Repositórios" value={repos?.length ?? "..."} subtitle="Azure DevOps" icon={Layers} color="primary" index={0} />
-        <StatsCard title="Templates" value={templates.length} subtitle="3 linguagens" icon={GitFork} color="accent" index={1} />
+        <StatsCard title="Templates" value={templates?.length ?? "..."} subtitle="argo-code" icon={GitFork} color="accent" index={1} />
         <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
         <StatsCard title="Deploys" value={156} subtitle="últimos 30 dias" icon={Activity} color="warning" index={3} />
       </div>
 
-      {/* Featured Templates */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground">Templates em Destaque</h2>
@@ -79,11 +76,18 @@ export default function Dashboard() {
             <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {featuredTemplates.map((template, i) => (
-            <TemplateCard key={template.id} template={template} index={i} onUse={handleUseTemplate} />
-          ))}
-        </div>
+        {loadingTemplates ? (
+          <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Carregando templates...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {featuredTemplates.map((template, i) => (
+              <TemplateCard key={template.id} template={template} index={i} onUse={handleUseTemplate} />
+            ))}
+          </div>
+        )}
       </div>
 
       <CreateComponentDialog
