@@ -87,13 +87,17 @@ serve(async (req) => {
 
       const supabaseAdmin = getSupabaseAdmin();
 
-      // Update status to "creating"
-      await supabaseAdmin.from('components').update({
-        approval_status: 'creating',
-      }).eq('id', componentId);
+      // Helper to update creation step
+      async function updateStep(step: string) {
+        await supabaseAdmin.from('components').update({
+          approval_status: 'creating',
+          creation_step: step,
+        }).eq('id', componentId);
+      }
 
       try {
-        // 1. Get the project ID
+        // Step 1: Creating repository
+        await updateStep('creating_repo');
         const projectData = await azureFetch(`${baseUrl}/_apis/projects/${encodeURIComponent(projectName)}?api-version=7.1`);
         const projectId = projectData.id;
 
@@ -109,7 +113,9 @@ serve(async (req) => {
         const repoUrl = repoData.webUrl || repoData.remoteUrl;
         const repoId = repoData.id;
 
-        // 3. Create initial commit with all template files
+        // Step 2: Pushing initial commit
+        await updateStep('pushing_code');
+
         const encoder = new TextEncoder();
         const encode64 = (str: string) => {
           const bytes = encoder.encode(str);
@@ -127,7 +133,7 @@ serve(async (req) => {
           java: {
             dockerfile: `# Final runtime image\nFROM eclipse-temurin:17-jre-jammy AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\nARG JAVA_JAR\nENV JAVA_JAR=\${JAVA_JAR}\n\nENV JAVA_OPTS=""\nENV TZ=America/Sao_Paulo\n\nENV APP_PORT=8080\n\nEXPOSE 8080\n\nENTRYPOINT ["sh", "-c", "java \${JAVA_OPTS} -jar \${JAVA_JAR}"]`,
             deepsource: `version = 1\n\n[[analyzers]]\nname = "java"\n\n  [analyzers.meta]\n  runtime_version = "17"`,
-            pipeline: `trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nvariables:\n  - template: base-argoit/variables/global.yml@argo-code\n\nstages:\n  - template: base-argoit/java/template.yml@argo-code\n    parameters:\n      environment: \\${{ variables.environment }}`,
+            pipeline: "trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nvariables:\n  - template: base-argoit/variables/global.yml@argo-code\n\nstages:\n  - template: base-argoit/java/template.yml@argo-code\n    parameters:\n      environment: ${{ variables.environment }}",
             srcFiles: [
               { path: "/pom.xml", content: `<?xml version="1.0" encoding="UTF-8"?>\n<project xmlns="http://maven.apache.org/POM/4.0.0"\n         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">\n    <modelVersion>4.0.0</modelVersion>\n    <parent>\n        <groupId>org.springframework.boot</groupId>\n        <artifactId>spring-boot-starter-parent</artifactId>\n        <version>3.2.0</version>\n        <relativePath/>\n    </parent>\n    <groupId>com.argoit</groupId>\n    <artifactId>${repoName}</artifactId>\n    <version>0.0.1-SNAPSHOT</version>\n    <name>${repoName}</name>\n    <description>Projeto criado pelo IDP ArgoIT</description>\n    <properties>\n        <java.version>17</java.version>\n    </properties>\n    <dependencies>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-web</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-actuator</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-test</artifactId>\n            <scope>test</scope>\n        </dependency>\n    </dependencies>\n    <build>\n        <plugins>\n            <plugin>\n                <groupId>org.springframework.boot</groupId>\n                <artifactId>spring-boot-maven-plugin</artifactId>\n            </plugin>\n        </plugins>\n    </build>\n</project>` },
               { path: "/src/main/java/com/argoit/Application.java", content: `package com.argoit;\n\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n\n@SpringBootApplication\npublic class Application {\n    public static void main(String[] args) {\n        SpringApplication.run(Application.class, args);\n    }\n}` },
@@ -140,7 +146,7 @@ serve(async (req) => {
           python: {
             dockerfile: `FROM python:3.11-slim\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV PYTHONUNBUFFERED=1\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY src/ ./src/\n\nEXPOSE 8080\n\nCMD ["python", "src/main.py"]`,
             deepsource: `version = 1\n\n[[analyzers]]\nname = "python"\n\n  [analyzers.meta]\n  runtime_version = "3.x"`,
-            pipeline: `trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nvariables:\n  - template: base-argoit/variables/global.yml@argo-code\n\nstages:\n  - template: base-argoit/python/template.yml@argo-code\n    parameters:\n      environment: \\${{ variables.environment }}`,
+            pipeline: "trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nvariables:\n  - template: base-argoit/variables/global.yml@argo-code\n\nstages:\n  - template: base-argoit/python/template.yml@argo-code\n    parameters:\n      environment: ${{ variables.environment }}",
             srcFiles: [
               { path: "/requirements.txt", content: `fastapi==0.104.1\nuvicorn==0.24.0\npydantic==2.5.0\npytest==7.4.3` },
               { path: "/src/__init__.py", content: `` },
@@ -189,7 +195,6 @@ serve(async (req) => {
           },
         ];
 
-        // Add language-specific src files
         for (const srcFile of langConfig.srcFiles) {
           changes.push({
             changeType: "add",
@@ -210,8 +215,8 @@ serve(async (req) => {
             }),
           });
 
-          // 4. Create branches: develop, feature/teste, release/v1.0
-          // Get main branch ref
+          // Step 3: Creating branches
+          await updateStep('creating_branches');
           const refsData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?filter=heads/main&api-version=7.1`);
           const mainRef = refsData.value?.[0];
           
@@ -233,16 +238,31 @@ serve(async (req) => {
               method: 'POST',
               body: JSON.stringify(refUpdates),
             });
+
+            // Step 4: Set develop as default branch
+            await updateStep('setting_default_branch');
+            await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}?api-version=7.1`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                defaultBranch: 'refs/heads/develop',
+              }),
+            });
           }
+
+          // Step 5: Running pipeline
+          await updateStep('running_pipeline');
+          // The pipeline runs automatically when azure-pipelines.yml is detected
+          // We just update the step for visual feedback
+          
         } catch (branchError) {
-          console.error('Branch creation warning:', branchError);
-          // Repo was created, branches may have partially failed
+          console.error('Branch/pipeline warning:', branchError);
         }
 
-        // 5. Update component with repo URL and status "created"
+        // Final: Update component with repo URL and status "created"
         await supabaseAdmin.from('components').update({
           approval_status: 'created',
           repo_url: repoUrl,
+          creation_step: 'done',
         }).eq('id', componentId);
 
         return new Response(JSON.stringify({ 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, XCircle, Clock, Loader2, GitFork, ExternalLink, AlertTriangle, ShieldCheck, User, FileText } from "lucide-react";
+import CreationStepper from "@/components/idp/CreationStepper";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -298,6 +299,14 @@ export default function Approvals() {
                     </Button>
                   )}
                 </div>
+
+                {isCreating && (
+                  <CreationStepper currentStep={comp.creation_step} isComplete={false} />
+                )}
+
+                {comp.approval_status === "created" && (
+                  <CreationStepper currentStep="done" isComplete={true} />
+                )}
 
                 {comp.repo_url && comp.approval_status === "created" && (
                   <div className="flex items-center gap-2 ml-14 p-2.5 rounded-lg bg-success/5 border border-success/20">
