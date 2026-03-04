@@ -568,6 +568,25 @@ serve(async (req) => {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      // Ensure environments exist before running
+      try {
+        const envNames = ['dev', 'stg', 'rc', 'prd'];
+        const existingEnvs = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`);
+        const existingNames = (existingEnvs.value || []).map((e: any) => e.name.toLowerCase());
+        for (const envName of envNames) {
+          if (!existingNames.includes(envName)) {
+            await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`, {
+              method: 'POST',
+              body: JSON.stringify({ name: envName, description: `Ambiente ${envName.toUpperCase()} - criado pelo IDP ArgoIT` }),
+            });
+            console.log(`Environment '${envName}' created before pipeline run`);
+          }
+        }
+      } catch (envErr) {
+        console.error('Environment pre-check warning:', envErr);
+      }
+
       const data = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineId}/runs?api-version=7.1`, {
         method: 'POST',
         body: JSON.stringify({
