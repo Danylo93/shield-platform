@@ -66,18 +66,18 @@ export default function Catalog() {
                 <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
                   <GitBranch className="h-5 w-5 text-muted-foreground" />
                 </div>
-                <div className="min-w-0">
+                <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
                     {repo.name}
                   </h3>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground truncate">
                     {repo.project.name}
                     {repo.defaultBranch && ` • ${repo.defaultBranch.replace("refs/heads/", "")}`}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <Badge variant="outline" className="text-[10px]">
+                <Badge variant="outline" className="text-[10px] max-w-[8rem] truncate">
                   {repo.project.name}
                 </Badge>
                 <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />

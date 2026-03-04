@@ -107,9 +107,9 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 mb-4">
+        <div className="flex items-center gap-2 mb-4 w-full min-w-0 overflow-x-auto">
           {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2 flex-1">
+            <div key={s.key} className="flex items-center gap-2 flex-1 min-w-0">
               <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full transition-colors ${
                 i <= currentStepIndex ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
               }`}>
@@ -142,15 +142,15 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                       const color = getProjectColor(project.name);
                       return (
                         <motion.div key={project.id} whileHover={{ x: 4 }} onClick={() => setSelectedProject(project)}
-                          className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                          className={`flex w-full overflow-hidden items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                             selectedProject?.id === project.id ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50 border border-transparent"
                           }`}>
                           <div className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
                             style={{ backgroundColor: color + "22", color }}>
                             {project.abbreviation || project.name.slice(0, 2).toUpperCase()}
                           </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-sm text-foreground">{project.name}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-foreground truncate">{project.name}</p>
                             <p className="text-xs text-muted-foreground truncate">{project.description || "Sem descrição"}</p>
                           </div>
                         </motion.div>
@@ -223,7 +223,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 <div className="flex justify-between"><span className="text-muted-foreground">Componente</span><span className="font-medium">{componentName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Repositório</span><span className="font-mono text-xs">{repoName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span>{template.name} ({langLabels[template.language] || template.language})</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Path</span><span className="font-mono text-xs">{template.path}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Path</span><span className="font-mono text-xs max-w-[12rem] sm:max-w-xs truncate text-right">{template.path}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Owner</span><span>{owner}</span></div>
                 {description && (
                   <div className="pt-2 border-t border-border">
