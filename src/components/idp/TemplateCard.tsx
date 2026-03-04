@@ -72,8 +72,8 @@ export function TemplateCard({ template, index, onUse }: TemplateCardProps) {
         </p>
 
         <div className="flex items-center justify-between pt-3 border-t border-border/50">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
-            {template.path}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono min-w-0 flex-1">
+            <span className="truncate">{template.path}</span>
           </div>
           <Button
             size="sm"
