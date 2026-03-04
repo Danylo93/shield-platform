@@ -109,8 +109,45 @@ serve(async (req) => {
         const repoUrl = repoData.webUrl || repoData.remoteUrl;
         const repoId = repoData.id;
 
-        // 3. Create initial commit with README to establish default branch
-        const readmeContent = btoa(`# ${repoName}\n\nRepositório criado automaticamente pelo IDP ArgoIT.`);
+        // 3. Create initial commit with all template files
+        const encoder = new TextEncoder();
+        const encode64 = (str: string) => {
+          const bytes = encoder.encode(str);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          return btoa(binary);
+        };
+
+        const readmeContent = `# ${repoName}\n\nRepositório criado automaticamente pelo IDP ArgoIT.\n\n## Branches\n- \`main\` - Branch principal\n- \`develop\` - Branch de desenvolvimento (padrão)\n- \`feature/teste\` - Branch de feature\n- \`release/v1.0\` - Branch de release`;
+
+        const dockerfileContent = `# Final runtime image\nFROM eclipse-temurin:17-jre-jammy AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\nARG JAVA_JAR\nENV JAVA_JAR=\${JAVA_JAR}\n\nENV JAVA_OPTS=""\nENV TZ=America/Sao_Paulo\n\nENV APP_PORT=8080\n\nEXPOSE 8080\n\n# Command to run the application with dynamic JAR name\nENTRYPOINT ["sh", "-c", "java \${JAVA_OPTS} -jar \${JAVA_JAR}"]`;
+
+        const deepsourceContent = `version = 1\n\n[[analyzers]]\nname = "java"\n\n  [analyzers.meta]\n  runtime_version = "17"`;
+
+        const azurePipelinesContent = `resources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\n\nextends:\n  template: base-argoit/java/template.yml@argo-code`;
+
+        const changes = [
+          {
+            changeType: "add",
+            item: { path: "/README.md" },
+            newContent: { content: encode64(readmeContent), contentType: "base64encoded" },
+          },
+          {
+            changeType: "add",
+            item: { path: "/Dockerfile" },
+            newContent: { content: encode64(dockerfileContent), contentType: "base64encoded" },
+          },
+          {
+            changeType: "add",
+            item: { path: "/.deepsource.toml" },
+            newContent: { content: encode64(deepsourceContent), contentType: "base64encoded" },
+          },
+          {
+            changeType: "add",
+            item: { path: "/azure-pipelines.yml" },
+            newContent: { content: encode64(azurePipelinesContent), contentType: "base64encoded" },
+          },
+        ];
         
         try {
           await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/pushes?api-version=7.1`, {
@@ -119,11 +156,7 @@ serve(async (req) => {
               refUpdates: [{ name: "refs/heads/main", oldObjectId: "0000000000000000000000000000000000000000" }],
               commits: [{
                 comment: "Initial commit - IDP ArgoIT",
-                changes: [{
-                  changeType: "add",
-                  item: { path: "/README.md" },
-                  newContent: { content: readmeContent, contentType: "base64encoded" },
-                }],
+                changes,
               }],
             }),
           });
