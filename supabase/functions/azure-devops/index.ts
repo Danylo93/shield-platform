@@ -85,7 +85,8 @@ serve(async (req) => {
       console.log('Repo default branch:', defaultBranch);
 
       // Get full tree with recursion, specifying version
-      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(basePath)}&recursionLevel=Full&includeContentMetadata=true&api-version=7.1`;
+      const branchName = defaultBranch.replace('refs/heads/', '');
+      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(basePath)}&recursionLevel=Full&includeContentMetadata=true&versionDescriptor.version=${encodeURIComponent(branchName)}&versionDescriptor.versionType=branch&api-version=7.1`;
       const data = await azureFetch(itemsEndpoint);
       
       const items = data.value || [];
