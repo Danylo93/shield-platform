@@ -52,12 +52,19 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   };
 
   const resetForm = () => {
-    setStep("info");
+    setStep("project");
+    setSelectedProject(null);
+    setProjectSearch("");
     setComponentName("");
     setRepoName("");
     setDescription("");
     setOwner("");
   };
+
+  const filteredProjects = projects.filter((p) =>
+    p.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
+    p.description.toLowerCase().includes(projectSearch.toLowerCase())
+  );
 
   const canProceedInfo = componentName.trim() && repoName.trim();
   const canProceedConfig = owner.trim();
