@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Template, languageLabels } from "@/data/templates";
+import { projects, Project } from "@/data/projects";
 import {
   Dialog,
   DialogContent,
@@ -14,8 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Rocket, GitBranch, Box, CheckCircle2 } from "lucide-react";
+import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search } from "lucide-react";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface CreateComponentDialogProps {
   open: boolean;
@@ -23,10 +25,12 @@ interface CreateComponentDialogProps {
   template: Template | null;
 }
 
-type Step = "info" | "config" | "review";
+type Step = "project" | "info" | "config" | "review";
 
 export function CreateComponentDialog({ open, onOpenChange, template }: CreateComponentDialogProps) {
-  const [step, setStep] = useState<Step>("info");
+  const [step, setStep] = useState<Step>("project");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projectSearch, setProjectSearch] = useState("");
   const [componentName, setComponentName] = useState("");
   const [repoName, setRepoName] = useState("");
   const [description, setDescription] = useState("");
@@ -40,7 +44,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
     setTimeout(() => {
       setCreating(false);
       toast.success(`Componente "${componentName}" criado com sucesso!`, {
-        description: `Repo: ${repoName} • Template: ${template.name}`,
+        description: `Projeto: ${selectedProject?.name} • Repo: ${repoName} • Template: ${template.name}`,
       });
       onOpenChange(false);
       resetForm();
@@ -48,17 +52,25 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   };
 
   const resetForm = () => {
-    setStep("info");
+    setStep("project");
+    setSelectedProject(null);
+    setProjectSearch("");
     setComponentName("");
     setRepoName("");
     setDescription("");
     setOwner("");
   };
 
+  const filteredProjects = projects.filter((p) =>
+    p.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
+    p.description.toLowerCase().includes(projectSearch.toLowerCase())
+  );
+
   const canProceedInfo = componentName.trim() && repoName.trim();
   const canProceedConfig = owner.trim();
 
   const steps: { key: Step; label: string; icon: React.ReactNode }[] = [
+    { key: "project", label: "Projeto", icon: <FolderOpen className="h-4 w-4" /> },
     { key: "info", label: "Informações", icon: <Box className="h-4 w-4" /> },
     { key: "config", label: "Configuração", icon: <GitBranch className="h-4 w-4" /> },
     { key: "review", label: "Revisão", icon: <CheckCircle2 className="h-4 w-4" /> },
@@ -68,7 +80,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
-      <DialogContent className="sm:max-w-lg glass">
+      <DialogContent className="sm:max-w-xl glass">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
@@ -105,6 +117,61 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
         </div>
 
         <AnimatePresence mode="wait">
+          {step === "project" && (
+            <motion.div
+              key="project"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-3"
+            >
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar projeto..."
+                  className="pl-9"
+                  value={projectSearch}
+                  onChange={(e) => setProjectSearch(e.target.value)}
+                />
+              </div>
+              <ScrollArea className="h-[280px] pr-2">
+                <div className="space-y-1.5">
+                  {filteredProjects.map((project) => (
+                    <motion.div
+                      key={project.id}
+                      whileHover={{ x: 4 }}
+                      onClick={() => setSelectedProject(project)}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedProject?.id === project.id
+                          ? "bg-primary/10 border border-primary/30"
+                          : "hover:bg-muted/50 border border-transparent"
+                      }`}
+                    >
+                      <div
+                        className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+                        style={{ backgroundColor: project.color + "22", color: project.color }}
+                      >
+                        {project.abbreviation}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-foreground">{project.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{project.description}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {filteredProjects.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum projeto encontrado</p>
+                  )}
+                </div>
+              </ScrollArea>
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setStep("info")} disabled={!selectedProject}>
+                  Próximo
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {step === "info" && (
             <motion.div
               key="info"
@@ -147,7 +214,8 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                   rows={3}
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={() => setStep("project")}>Voltar</Button>
                 <Button onClick={() => setStep("config")} disabled={!canProceedInfo}>
                   Próximo
                 </Button>
@@ -205,6 +273,10 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
               className="space-y-4"
             >
               <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Projeto</span>
+                  <span className="font-medium">{selectedProject?.name}</span>
+                </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Componente</span>
                   <span className="font-medium">{componentName}</span>
