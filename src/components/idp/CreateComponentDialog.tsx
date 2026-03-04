@@ -43,7 +43,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   const [description, setDescription] = useState("");
   const [owner, setOwner] = useState("");
   const [creating, setCreating] = useState(false);
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const { data: projects, isLoading: loadingProjects } = useAzureProjects();
 
@@ -61,6 +61,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
         project_name: selectedProject.name,
         repo_name: repoName,
         created_by: user.id,
+        squad: profile?.squad || "",
         approval_status: "pending",
       });
       if (error) throw error;

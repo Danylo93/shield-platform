@@ -29,6 +29,7 @@ export type Database = {
           rejection_reason: string | null
           repo_name: string | null
           repo_url: string | null
+          squad: string
           template_id: string | null
           updated_at: string
         }
@@ -46,6 +47,7 @@ export type Database = {
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
+          squad?: string
           template_id?: string | null
           updated_at?: string
         }
@@ -63,6 +65,7 @@ export type Database = {
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
+          squad?: string
           template_id?: string | null
           updated_at?: string
         }
@@ -75,6 +78,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          squad: string
           updated_at: string
         }
         Insert: {
@@ -83,6 +87,7 @@ export type Database = {
           email: string
           full_name?: string
           id: string
+          squad?: string
           updated_at?: string
         }
         Update: {
@@ -91,6 +96,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          squad?: string
           updated_at?: string
         }
         Relationships: []
