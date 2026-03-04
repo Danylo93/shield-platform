@@ -26,19 +26,9 @@ import {
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
-
-const mainItems = [
-  { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "Catálogo", url: "/catalog", icon: Layers },
-  { title: "Templates", url: "/templates", icon: GitFork },
-  { title: "Aprovações", url: "/approvals", icon: ShieldCheck },
-];
-
-const adminItems = [
-  { title: "Configurações", url: "/settings", icon: Settings },
-];
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -46,18 +36,39 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const isActive = (path: string) => location.pathname === path;
-  const { profile, roles, signOut } = useAuth();
+  const { profile, roles, isDevOps, signOut } = useAuth();
 
   const initials = profile?.full_name
     ? profile.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
     : profile?.email?.slice(0, 2).toUpperCase() || "??";
 
-  const roleBadge = roles.includes("devops") ? "DevOps" : "Dev";
+  const roleBadge = isDevOps ? "DevOps" : "Dev";
 
   const handleSignOut = async () => {
     await signOut();
     navigate("/login");
   };
+
+  // Dev items - no Aprovações (only devops sees that)
+  const devItems = [
+    { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Meus Componentes", url: "/catalog", icon: Layers },
+    { title: "Templates", url: "/templates", icon: GitFork },
+  ];
+
+  // DevOps gets Aprovações
+  const devopsItems = [
+    { title: "Dashboard", url: "/", icon: LayoutDashboard },
+    { title: "Catálogo", url: "/catalog", icon: Layers },
+    { title: "Templates", url: "/templates", icon: GitFork },
+    { title: "Aprovações", url: "/approvals", icon: ShieldCheck },
+  ];
+
+  const mainItems = isDevOps ? devopsItems : devItems;
+
+  const adminItems = isDevOps
+    ? [{ title: "Configurações", url: "/settings", icon: Settings }]
+    : [];
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -118,32 +129,35 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator />
-
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10px] uppercase tracking-wider">
-            Admin
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {adminItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={isActive(item.url)}>
-                    <NavLink
-                      to={item.url}
-                      end
-                      className="hover:bg-sidebar-accent"
-                      activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
-                    >
-                      <item.icon className="h-4 w-4" />
-                      {!collapsed && <span>{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {adminItems.length > 0 && (
+          <>
+            <SidebarSeparator />
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-sidebar-foreground/50 text-[10px] uppercase tracking-wider">
+                Admin
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild isActive={isActive(item.url)}>
+                        <NavLink
+                          to={item.url}
+                          end
+                          className="hover:bg-sidebar-accent"
+                          activeClassName="bg-sidebar-accent text-sidebar-primary font-medium"
+                        >
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.title}</span>}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="p-3">
@@ -159,7 +173,12 @@ export function AppSidebar() {
               <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
                 {profile?.full_name || profile?.email || "Usuário"}
               </p>
-              <p className="text-[10px] text-sidebar-foreground truncate">{roleBadge}</p>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] text-sidebar-foreground truncate">{roleBadge}</span>
+                {profile?.squad && (
+                  <span className="text-[10px] text-sidebar-foreground/60 truncate">• {profile.squad}</span>
+                )}
+              </div>
             </div>
           )}
           {!collapsed && (
