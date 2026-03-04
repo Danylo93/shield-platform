@@ -264,10 +264,9 @@ serve(async (req) => {
             });
           }
 
-          // Step 5: Create pipeline definition and run on develop
-          await updateStep('running_pipeline');
+          // Step 5: Create pipeline definition
+          await updateStep('creating_pipeline');
           try {
-            // Create pipeline definition pointing to the repo's azure-pipelines.yml
             const pipelineData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`, {
               method: 'POST',
               body: JSON.stringify({
@@ -285,6 +284,9 @@ serve(async (req) => {
             });
 
             console.log('Pipeline created:', pipelineData.id);
+
+            // Step 6: Run pipeline on develop
+            await updateStep('running_pipeline');
 
             // Run the pipeline on develop branch
             await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineData.id}/runs?api-version=7.1`, {
