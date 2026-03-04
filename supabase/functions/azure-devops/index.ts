@@ -447,6 +447,85 @@ serve(async (req) => {
       });
     }
 
+    // List pipelines for a project
+    if (action === 'pipelines') {
+      const projectName = url.searchParams.get('project');
+      if (!projectName) {
+        return new Response(JSON.stringify({ error: 'project is required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`);
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // List branches for a repo
+    if (action === 'branches') {
+      const projectName = url.searchParams.get('project');
+      const repoNameParam = url.searchParams.get('repo');
+      if (!projectName || !repoNameParam) {
+        return new Response(JSON.stringify({ error: 'project and repo are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${encodeURIComponent(repoNameParam)}/refs?filter=heads/&api-version=7.1`);
+      const branches = (data.value || []).map((ref: any) => ({
+        name: ref.name.replace('refs/heads/', ''),
+        objectId: ref.objectId,
+      }));
+      return new Response(JSON.stringify({ value: branches }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // List pipeline runs
+    if (action === 'pipeline-runs') {
+      const projectName = url.searchParams.get('project');
+      const pipelineId = url.searchParams.get('pipelineId');
+      if (!projectName || !pipelineId) {
+        return new Response(JSON.stringify({ error: 'project and pipelineId are required' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineId}/runs?api-version=7.1`);
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Run a pipeline on a specific branch
+    if (action === 'run-pipeline') {
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'POST required' }), {
+          status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const body = await req.json();
+      const { projectName, pipelineId, branch } = body;
+      if (!projectName || !pipelineId || !branch) {
+        return new Response(JSON.stringify({ error: 'Missing projectName, pipelineId or branch' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const data = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineId}/runs?api-version=7.1`, {
+        method: 'POST',
+        body: JSON.stringify({
+          resources: {
+            repositories: {
+              self: {
+                refName: `refs/heads/${branch}`,
+              },
+            },
+          },
+        }),
+      });
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
