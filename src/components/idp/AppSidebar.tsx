@@ -7,6 +7,7 @@ import {
   LogOut,
   Sparkles,
   ShieldCheck,
+  Play,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -54,6 +55,7 @@ export function AppSidebar() {
     { title: "Dashboard", url: "/", icon: LayoutDashboard },
     { title: "Meus Componentes", url: "/catalog", icon: Layers },
     { title: "Templates", url: "/templates", icon: GitFork },
+    { title: "Pipelines", url: "/pipelines", icon: Play },
   ];
 
   // DevOps gets Aprovações
@@ -61,6 +63,7 @@ export function AppSidebar() {
     { title: "Dashboard", url: "/", icon: LayoutDashboard },
     { title: "Catálogo", url: "/catalog", icon: Layers },
     { title: "Templates", url: "/templates", icon: GitFork },
+    { title: "Pipelines", url: "/pipelines", icon: Play },
     { title: "Aprovações", url: "/approvals", icon: ShieldCheck },
   ];
 
