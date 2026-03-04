@@ -265,6 +265,53 @@ serve(async (req) => {
       }
     }
 
+    if (action === 'delete-repo') {
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'POST required' }), {
+          status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const body = await req.json();
+      const { componentId, projectName, repoName } = body;
+
+      if (!componentId || !projectName || !repoName) {
+        return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const supabaseAdmin = getSupabaseAdmin();
+
+      try {
+        // Get repo ID
+        const repoInfo = await azureFetch(
+          `${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${encodeURIComponent(repoName)}?api-version=7.1`
+        );
+
+        // Delete the repo
+        const res = await fetch(
+          `${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoInfo.id}?api-version=7.1`,
+          { method: 'DELETE', headers: { 'Authorization': authHeader } }
+        );
+
+        if (!res.ok && res.status !== 404) {
+          const text = await res.text();
+          throw new Error(`Failed to delete repo: ${text}`);
+        }
+      } catch (e) {
+        console.error('Repo deletion warning:', (e as Error).message);
+        // Continue to delete the component record even if Azure deletion fails
+      }
+
+      // Delete component record
+      await supabaseAdmin.from('components').delete().eq('id', componentId);
+
+      return new Response(JSON.stringify({ success: true, message: 'Repositório excluído' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'templates') {
       const project = url.searchParams.get('project') || 'Devops';
       const repo = url.searchParams.get('repo') || 'argo-code';

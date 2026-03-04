@@ -1,11 +1,23 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { GitBranch, Search, Loader2, AlertCircle, Clock, CheckCircle2, XCircle, ExternalLink, AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { GitBranch, Search, Loader2, AlertCircle, Clock, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pendente", color: "bg-warning/10 text-warning border-warning/20", icon: Clock },
@@ -25,6 +37,7 @@ const langColors: Record<string, string> = {
 export default function Catalog() {
   const { user, isDevOps, profile } = useAuth();
   const [search, setSearch] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
   const queryClient = useQueryClient();
 
   const { data: components, isLoading, error } = useQuery({
@@ -45,7 +58,7 @@ export default function Catalog() {
     enabled: !!user,
   });
 
-  // Realtime subscription for live updates
+  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel('catalog-realtime')
@@ -55,6 +68,42 @@ export default function Catalog() {
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [queryClient]);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (comp: any) => {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+      const res = await fetch(`${supabaseUrl}/functions/v1/azure-devops?action=delete-repo`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          componentId: comp.id,
+          projectName: comp.project_name,
+          repoName: comp.repo_name || comp.name,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["my-components"] });
+      queryClient.invalidateQueries({ queryKey: ["components-approvals"] });
+      setDeleteTarget(null);
+      toast({ title: "Componente excluído com sucesso" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
 
   const filtered = (components || []).filter((c: any) =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -110,6 +159,7 @@ export default function Catalog() {
             const status = statusConfig[comp.approval_status] || statusConfig.pending;
             const StatusIcon = status.icon;
             const isCreating = comp.approval_status === "creating";
+            const canDelete = isDevOps || comp.created_by === user?.id;
             return (
               <motion.div
                 key={comp.id}
@@ -139,6 +189,16 @@ export default function Catalog() {
                     {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <StatusIcon className="h-3 w-3" />}
                     {status.label}
                   </Badge>
+                  {canDelete && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteTarget(comp)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
 
                 {/* Show repo link when created */}
@@ -165,6 +225,37 @@ export default function Catalog() {
           })}
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir componente</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir <strong className="text-foreground">{deleteTarget?.name}</strong>?
+              {deleteTarget?.approval_status === "created" && (
+                <> O repositório <strong className="text-foreground">{deleteTarget?.repo_name || deleteTarget?.name}</strong> também será excluído do Azure DevOps.</>
+              )}
+              <br /><br />
+              <span className="text-destructive font-medium">Esta ação não pode ser desfeita.</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-1" />Excluindo...</>
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
