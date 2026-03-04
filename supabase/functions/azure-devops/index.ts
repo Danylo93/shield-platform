@@ -28,6 +28,7 @@ serve(async (req) => {
   const baseUrl = `https://dev.azure.com/${AZURE_DEVOPS_ORG}`;
 
   async function azureFetch(endpoint: string) {
+    console.log('Fetching:', endpoint);
     const res = await fetch(endpoint, {
       headers: { 'Authorization': authHeader },
     });
@@ -60,39 +61,65 @@ serve(async (req) => {
       });
     }
 
+    if (action === 'tree') {
+      // Debug: return raw tree of a repo path
+      const project = url.searchParams.get('project') || 'Devops';
+      const repo = url.searchParams.get('repo') || 'argo-code';
+      const path = url.searchParams.get('path') || '/base-argoit';
+      
+      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(path)}&recursionLevel=Full&includeContentMetadata=true&api-version=7.1`;
+      const data = await azureFetch(itemsEndpoint);
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (action === 'templates') {
       const project = url.searchParams.get('project') || 'Devops';
       const repo = url.searchParams.get('repo') || 'argo-code';
       const path = url.searchParams.get('path') || '/base-argoit';
-      const branch = url.searchParams.get('branch') || 'main';
 
-      // Get items (folders) in the path
-      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(path)}&recursionLevel=OneLevel&api-version=7.1`;
+      // Get full tree to discover all templates
+      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(path)}&recursionLevel=Full&includeContentMetadata=true&api-version=7.1`;
       const data = await azureFetch(itemsEndpoint);
       
-      // For each language folder, get sub-items (template folders)
       const items = data.value || [];
-      const languageFolders = items.filter((item: any) => item.isFolder && item.path !== path);
+      console.log(`Found ${items.length} items in tree`);
       
+      // Find language folders (direct children of base-argoit that are dotnet/java/python)
+      const langNames = ['dotnet', 'java', 'python'];
       const templates: any[] = [];
       
-      for (const langFolder of languageFolders) {
-        const langName = langFolder.path.split('/').pop();
-        // Skip non-language folders like 'templates', 'tools', 'examples', 'variables'
-        if (!['dotnet', 'java', 'python'].includes(langName)) continue;
+      // Group items by their parent language folder
+      for (const item of items) {
+        const relativePath = item.path.replace(path + '/', '');
+        const parts = relativePath.split('/');
         
-        // Get sub-templates inside each language folder
-        const subEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(langFolder.path)}&recursionLevel=OneLevel&api-version=7.1`;
-        const subData = await azureFetch(subEndpoint);
-        const subItems = subData.value || [];
-        
-        for (const item of subItems) {
-          if (item.isFolder && item.path !== langFolder.path) {
-            const templateName = item.path.split('/').pop();
+        // We want items that are: langFolder/templateName (exactly 2 levels deep)
+        // OR langFolder itself if it has files directly
+        if (parts.length === 2 && langNames.includes(parts[0]) && item.gitObjectType === 'tree') {
+          templates.push({
+            id: item.objectId || `${parts[0]}-${parts[1]}`,
+            name: parts[1],
+            language: parts[0],
+            path: item.path,
+            repoName: repo,
+            project: project,
+          });
+        }
+      }
+      
+      // If no sub-templates found, treat each language folder itself as a template
+      if (templates.length === 0) {
+        for (const item of items) {
+          const relativePath = item.path.replace(path + '/', '');
+          const parts = relativePath.split('/');
+          
+          if (parts.length === 1 && langNames.includes(parts[0]) && (item.gitObjectType === 'tree' || item.isFolder)) {
             templates.push({
-              id: item.objectId || `${langName}-${templateName}`,
-              name: templateName,
-              language: langName,
+              id: item.objectId || parts[0],
+              name: parts[0],
+              language: parts[0],
               path: item.path,
               repoName: repo,
               project: project,
@@ -101,12 +128,13 @@ serve(async (req) => {
         }
       }
 
+      console.log(`Returning ${templates.length} templates`);
       return new Response(JSON.stringify({ value: templates }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action. Use: projects, repos, templates' }), {
+    return new Response(JSON.stringify({ error: 'Invalid action. Use: projects, repos, templates, tree' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
