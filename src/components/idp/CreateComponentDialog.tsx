@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Template, languageLabels } from "@/data/templates";
-import { projects, Project } from "@/data/projects";
+import { useAzureProjects, AzureProject } from "@/hooks/useAzureDevOps";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search } from "lucide-react";
+import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -29,13 +29,15 @@ type Step = "project" | "info" | "config" | "review";
 
 export function CreateComponentDialog({ open, onOpenChange, template }: CreateComponentDialogProps) {
   const [step, setStep] = useState<Step>("project");
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<AzureProject | null>(null);
   const [projectSearch, setProjectSearch] = useState("");
   const [componentName, setComponentName] = useState("");
   const [repoName, setRepoName] = useState("");
   const [description, setDescription] = useState("");
   const [owner, setOwner] = useState("");
   const [creating, setCreating] = useState(false);
+
+  const { data: projects, isLoading: loadingProjects } = useAzureProjects();
 
   if (!template) return null;
 
@@ -61,9 +63,9 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
     setOwner("");
   };
 
-  const filteredProjects = projects.filter((p) =>
+  const filteredProjects = (projects || []).filter((p) =>
     p.name.toLowerCase().includes(projectSearch.toLowerCase()) ||
-    p.description.toLowerCase().includes(projectSearch.toLowerCase())
+    (p.description || "").toLowerCase().includes(projectSearch.toLowerCase())
   );
 
   const canProceedInfo = componentName.trim() && repoName.trim();
@@ -77,6 +79,14 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   ];
 
   const currentStepIndex = steps.findIndex((s) => s.key === step);
+
+  // Generate a color from project name
+  const getProjectColor = (name: string) => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    const h = hash % 360;
+    return `hsl(${h}, 60%, 50%)`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
@@ -128,41 +138,51 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar projeto..."
+                  placeholder="Buscar projeto no Azure DevOps..."
                   className="pl-9"
                   value={projectSearch}
                   onChange={(e) => setProjectSearch(e.target.value)}
                 />
               </div>
               <ScrollArea className="h-[280px] pr-2">
-                <div className="space-y-1.5">
-                  {filteredProjects.map((project) => (
-                    <motion.div
-                      key={project.id}
-                      whileHover={{ x: 4 }}
-                      onClick={() => setSelectedProject(project)}
-                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                        selectedProject?.id === project.id
-                          ? "bg-primary/10 border border-primary/30"
-                          : "hover:bg-muted/50 border border-transparent"
-                      }`}
-                    >
-                      <div
-                        className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
-                        style={{ backgroundColor: project.color + "22", color: project.color }}
-                      >
-                        {project.abbreviation}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-foreground">{project.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{project.description}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                  {filteredProjects.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum projeto encontrado</p>
-                  )}
-                </div>
+                {loadingProjects ? (
+                  <div className="flex items-center justify-center py-16 gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Carregando projetos...</span>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {filteredProjects.map((project) => {
+                      const color = getProjectColor(project.name);
+                      return (
+                        <motion.div
+                          key={project.id}
+                          whileHover={{ x: 4 }}
+                          onClick={() => setSelectedProject(project)}
+                          className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                            selectedProject?.id === project.id
+                              ? "bg-primary/10 border border-primary/30"
+                              : "hover:bg-muted/50 border border-transparent"
+                          }`}
+                        >
+                          <div
+                            className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+                            style={{ backgroundColor: color + "22", color }}
+                          >
+                            {project.abbreviation || project.name.slice(0, 2).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-foreground">{project.name}</p>
+                            <p className="text-xs text-muted-foreground truncate">{project.description || "Sem descrição"}</p>
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                    {filteredProjects.length === 0 && !loadingProjects && (
+                      <p className="text-sm text-muted-foreground text-center py-8">Nenhum projeto encontrado</p>
+                    )}
+                  </div>
+                )}
               </ScrollArea>
               <div className="flex justify-end pt-2">
                 <Button onClick={() => setStep("info")} disabled={!selectedProject}>

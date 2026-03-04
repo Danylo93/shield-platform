@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Layers, GitFork, Users, Activity, Plus, ArrowRight } from "lucide-react";
+import { Layers, GitFork, Users, Activity, Plus, ArrowRight, Loader2 } from "lucide-react";
 import { templates } from "@/data/templates";
 import { TemplateCard } from "@/components/idp/TemplateCard";
 import { CreateComponentDialog } from "@/components/idp/CreateComponentDialog";
@@ -8,11 +8,15 @@ import { StatsCard } from "@/components/idp/StatsCard";
 import { Button } from "@/components/ui/button";
 import { Template } from "@/data/templates";
 import { useNavigate } from "react-router-dom";
+import { useAzureRepos, useAzureProjects } from "@/hooks/useAzureDevOps";
 
 export default function Dashboard() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useNavigate();
+
+  const { data: repos } = useAzureRepos();
+  const { data: projects } = useAzureProjects();
 
   const handleUseTemplate = (template: Template) => {
     setSelectedTemplate(template);
@@ -39,10 +43,7 @@ export default function Dashboard() {
             o desenvolvimento com nossa plataforma interna.
           </p>
           <div className="flex gap-3 mt-6">
-            <Button
-              className="gap-2"
-              onClick={() => navigate("/templates")}
-            >
+            <Button className="gap-2" onClick={() => navigate("/templates")}>
               <Plus className="h-4 w-4" />
               Novo Componente
             </Button>
@@ -52,7 +53,6 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
-        {/* Floating decorative element */}
         <motion.div
           className="absolute right-8 top-8 opacity-10"
           animate={{ y: [0, -8, 0] }}
@@ -64,9 +64,9 @@ export default function Dashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatsCard title="Componentes" value={47} subtitle="+3 esta semana" icon={Layers} color="primary" index={0} />
+        <StatsCard title="Repositórios" value={repos?.length ?? "..."} subtitle="Azure DevOps" icon={Layers} color="primary" index={0} />
         <StatsCard title="Templates" value={templates.length} subtitle="3 linguagens" icon={GitFork} color="accent" index={1} />
-        <StatsCard title="Squads" value={12} subtitle="ativos" icon={Users} color="success" index={2} />
+        <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
         <StatsCard title="Deploys" value={156} subtitle="últimos 30 dias" icon={Activity} color="warning" index={3} />
       </div>
 

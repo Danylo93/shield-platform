@@ -1,1 +1,4 @@
 project_id = "fbuerbcrvxstxrlxbqtw"
+
+[functions.azure-devops]
+verify_jwt = false
