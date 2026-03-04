@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 serve(async (req) => {
@@ -22,13 +23,28 @@ serve(async (req) => {
   const authHeader = `Basic ${btoa(`:${AZURE_DEVOPS_PAT}`)}`;
   const baseUrl = `https://dev.azure.com/${AZURE_DEVOPS_ORG}`;
 
-  async function azureFetch(endpoint: string) {
-    const res = await fetch(endpoint, { headers: { 'Authorization': authHeader } });
+  async function azureFetch(endpoint: string, options?: RequestInit) {
+    const res = await fetch(endpoint, {
+      ...options,
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/json',
+        ...(options?.headers || {}),
+      },
+    });
     if (!res.ok) {
       const text = await res.text();
       throw new Error(`Azure API [${res.status}]: ${text}`);
     }
     return res.json();
+  }
+
+  // Helper to get supabase admin client
+  function getSupabaseAdmin() {
+    return createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    );
   }
 
   try {
@@ -52,18 +68,131 @@ serve(async (req) => {
       });
     }
 
+    if (action === 'create-repo') {
+      // POST request with component details
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'POST required' }), {
+          status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const body = await req.json();
+      const { componentId, projectName, repoName } = body;
+
+      if (!componentId || !projectName || !repoName) {
+        return new Response(JSON.stringify({ error: 'Missing componentId, projectName or repoName' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const supabaseAdmin = getSupabaseAdmin();
+
+      // Update status to "creating"
+      await supabaseAdmin.from('components').update({
+        approval_status: 'creating',
+      }).eq('id', componentId);
+
+      try {
+        // 1. Get the project ID
+        const projectData = await azureFetch(`${baseUrl}/_apis/projects/${encodeURIComponent(projectName)}?api-version=7.1`);
+        const projectId = projectData.id;
+
+        // 2. Create the repository
+        const repoData = await azureFetch(`${baseUrl}/_apis/git/repositories?api-version=7.1`, {
+          method: 'POST',
+          body: JSON.stringify({
+            name: repoName,
+            project: { id: projectId },
+          }),
+        });
+
+        const repoUrl = repoData.webUrl || repoData.remoteUrl;
+        const repoId = repoData.id;
+
+        // 3. Create initial commit with README to establish default branch
+        const readmeContent = btoa(`# ${repoName}\n\nRepositório criado automaticamente pelo IDP ArgoIT.`);
+        
+        try {
+          await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/pushes?api-version=7.1`, {
+            method: 'POST',
+            body: JSON.stringify({
+              refUpdates: [{ name: "refs/heads/main", oldObjectId: "0000000000000000000000000000000000000000" }],
+              commits: [{
+                comment: "Initial commit - IDP ArgoIT",
+                changes: [{
+                  changeType: "add",
+                  item: { path: "/README.md" },
+                  newContent: { content: readmeContent, contentType: "base64encoded" },
+                }],
+              }],
+            }),
+          });
+
+          // 4. Create branches: develop, feature/teste, release/v1.0
+          // Get main branch ref
+          const refsData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?filter=heads/main&api-version=7.1`);
+          const mainRef = refsData.value?.[0];
+          
+          if (mainRef) {
+            const mainObjectId = mainRef.objectId;
+            const branchesToCreate = [
+              "refs/heads/develop",
+              "refs/heads/feature/teste",
+              "refs/heads/release/v1.0",
+            ];
+
+            const refUpdates = branchesToCreate.map(name => ({
+              name,
+              oldObjectId: "0000000000000000000000000000000000000000",
+              newObjectId: mainObjectId,
+            }));
+
+            await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?api-version=7.1`, {
+              method: 'POST',
+              body: JSON.stringify(refUpdates),
+            });
+          }
+        } catch (branchError) {
+          console.error('Branch creation warning:', branchError);
+          // Repo was created, branches may have partially failed
+        }
+
+        // 5. Update component with repo URL and status "created"
+        await supabaseAdmin.from('components').update({
+          approval_status: 'created',
+          repo_url: repoUrl,
+        }).eq('id', componentId);
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          repoUrl,
+          repoId: repoData.id,
+          message: 'Repositório criado com sucesso' 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+
+      } catch (createError) {
+        // Update component with error status
+        await supabaseAdmin.from('components').update({
+          approval_status: 'error',
+          rejection_reason: `Erro ao criar repo: ${(createError as Error).message}`,
+        }).eq('id', componentId);
+
+        throw createError;
+      }
+    }
+
     if (action === 'templates') {
       const project = url.searchParams.get('project') || 'Devops';
       const repo = url.searchParams.get('repo') || 'argo-code';
       const basePath = url.searchParams.get('path') || '/base-argoit';
 
-      // Use repo ID for reliability
       const repoInfo = await azureFetch(
         `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}?api-version=7.1`
       );
       const repoId = repoInfo.id;
 
-      // Get items - try multiple path formats
       let items: any[] = [];
       const pathsToTry = [basePath, basePath.replace(/^\//, '')];
       
@@ -73,13 +202,9 @@ serve(async (req) => {
           console.log('Trying items endpoint:', endpoint);
           const data = await azureFetch(endpoint);
           
-          if (Array.isArray(data)) {
-            items = data;
-          } else if (data.value && data.value.length > 0) {
-            items = data.value;
-          } else if (data.count > 0) {
-            items = data.value || [];
-          }
+          if (Array.isArray(data)) items = data;
+          else if (data.value && data.value.length > 0) items = data.value;
+          else if (data.count > 0) items = data.value || [];
           
           if (items.length > 0) {
             console.log(`Found ${items.length} items with path: ${tryPath}`);
@@ -90,36 +215,25 @@ serve(async (req) => {
         }
       }
 
-      // If items API didn't work, try getting root items and filtering
       if (items.length === 0) {
-        console.log('Trying root items...');
         try {
           const rootEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${repoId}/items?recursionLevel=OneLevel&api-version=7.1`;
           const rootData = await azureFetch(rootEndpoint);
           const rootItems = rootData.value || [];
-          console.log('Root items:', rootItems.map((i: any) => i.path));
-          
-          // Find the base-argoit folder
           const baseFolder = rootItems.find((i: any) => 
             i.path === basePath || i.path === basePath.replace(/^\//, '') || 
             i.path === '/base-argoit' || i.path === 'base-argoit'
           );
-          
           if (baseFolder) {
-            console.log('Found base folder:', baseFolder.path);
             const subEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${repoId}/items?scopePath=${encodeURIComponent(baseFolder.path)}&recursionLevel=Full&api-version=7.1`;
             const subData = await azureFetch(subEndpoint);
             items = subData.value || [];
-            console.log(`Found ${items.length} items under ${baseFolder.path}`);
-          } else {
-            console.log('base-argoit not found in root. Available:', rootItems.map((i: any) => i.path));
           }
         } catch (e) {
           console.error('Root items failed:', (e as Error).message);
         }
       }
 
-      // Parse templates from items
       const langNames = ['dotnet', 'java', 'python'];
       const templates: any[] = [];
       const normalizedBase = basePath.startsWith('/') ? basePath : '/' + basePath;
@@ -128,11 +242,9 @@ serve(async (req) => {
         const p = item.path?.startsWith('/') ? item.path : '/' + (item.path || '');
         if (p === normalizedBase) continue;
         if (!p.startsWith(normalizedBase + '/')) continue;
-
         const rel = p.substring(normalizedBase.length + 1);
         const parts = rel.split('/');
         const isFolder = item.gitObjectType === 'tree' || item.isFolder === true;
-
         if (parts.length === 2 && langNames.includes(parts[0]) && isFolder) {
           templates.push({
             id: item.objectId || `${parts[0]}-${parts[1]}`,
@@ -145,7 +257,6 @@ serve(async (req) => {
         }
       }
 
-      // Fallback: language folders
       if (templates.length === 0) {
         for (const item of items) {
           const p = item.path?.startsWith('/') ? item.path : '/' + (item.path || '');
