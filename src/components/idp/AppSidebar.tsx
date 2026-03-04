@@ -6,9 +6,10 @@ import {
   Search,
   LogOut,
   Sparkles,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -26,11 +27,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Catálogo", url: "/catalog", icon: Layers },
   { title: "Templates", url: "/templates", icon: GitFork },
+  { title: "Aprovações", url: "/approvals", icon: ShieldCheck },
 ];
 
 const adminItems = [
@@ -41,7 +44,20 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const navigate = useNavigate();
   const isActive = (path: string) => location.pathname === path;
+  const { profile, roles, signOut } = useAuth();
+
+  const initials = profile?.full_name
+    ? profile.full_name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
+    : profile?.email?.slice(0, 2).toUpperCase() || "??";
+
+  const roleBadge = roles.includes("devops") ? "DevOps" : "Dev";
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
@@ -135,17 +151,22 @@ export function AppSidebar() {
         <div className="flex items-center gap-3">
           <Avatar className="h-8 w-8 shrink-0">
             <AvatarFallback className="bg-primary/20 text-primary text-xs font-semibold">
-              DV
+              {initials}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
-              <p className="text-xs font-medium text-sidebar-accent-foreground truncate">Dev User</p>
-              <p className="text-[10px] text-sidebar-foreground truncate">Azure DevOps</p>
+              <p className="text-xs font-medium text-sidebar-accent-foreground truncate">
+                {profile?.full_name || profile?.email || "Usuário"}
+              </p>
+              <p className="text-[10px] text-sidebar-foreground truncate">{roleBadge}</p>
             </div>
           )}
           {!collapsed && (
-            <button className="text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors">
+            <button
+              onClick={handleSignOut}
+              className="text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors"
+            >
               <LogOut className="h-4 w-4" />
             </button>
           )}
