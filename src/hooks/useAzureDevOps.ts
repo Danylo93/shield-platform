@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface AzureProject {
   id: string;
@@ -22,16 +21,17 @@ export interface AzureRepo {
   webUrl: string;
 }
 
+export interface AzureTemplate {
+  id: string;
+  name: string;
+  language: "java" | "python" | "dotnet";
+  path: string;
+  repoName: string;
+  project: string;
+}
+
 async function fetchFromAzure(action: string, params?: Record<string, string>) {
   const queryParams = new URLSearchParams({ action, ...params });
-  const { data, error } = await supabase.functions.invoke("azure-devops", {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    body: undefined,
-  });
-
-  // supabase.functions.invoke doesn't support query params easily, so use fetch directly
-  const projectId = (await supabase.auth.getSession()).data.session?.access_token;
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -74,6 +74,17 @@ export function useAzureRepos(projectName?: string) {
       const params = projectName ? { project: projectName } : {};
       const data = await fetchFromAzure("repos", params);
       return data.value as AzureRepo[];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useAzureTemplates() {
+  return useQuery({
+    queryKey: ["azure-templates"],
+    queryFn: async () => {
+      const data = await fetchFromAzure("templates");
+      return data.value as AzureTemplate[];
     },
     staleTime: 5 * 60 * 1000,
   });
