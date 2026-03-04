@@ -77,7 +77,7 @@ serve(async (req) => {
       }
 
       const body = await req.json();
-      const { componentId, projectName, repoName } = body;
+      const { componentId, projectName, repoName, language } = body;
 
       if (!componentId || !projectName || !repoName) {
         return new Response(JSON.stringify({ error: 'Missing componentId, projectName or repoName' }), {
@@ -120,13 +120,53 @@ serve(async (req) => {
 
         const readmeContent = `# ${repoName}\n\nRepositório criado automaticamente pelo IDP ArgoIT.\n\n## Branches\n- \`main\` - Branch principal\n- \`develop\` - Branch de desenvolvimento (padrão)\n- \`feature/teste\` - Branch de feature\n- \`release/v1.0\` - Branch de release`;
 
-        const dockerfileContent = `# Final runtime image\nFROM eclipse-temurin:17-jre-jammy AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\nARG JAVA_JAR\nENV JAVA_JAR=\${JAVA_JAR}\n\nENV JAVA_OPTS=""\nENV TZ=America/Sao_Paulo\n\nENV APP_PORT=8080\n\nEXPOSE 8080\n\n# Command to run the application with dynamic JAR name\nENTRYPOINT ["sh", "-c", "java \${JAVA_OPTS} -jar \${JAVA_JAR}"]`;
+        const lang = (language || 'java').toLowerCase();
 
-        const deepsourceContent = `version = 1\n\n[[analyzers]]\nname = "java"\n\n  [analyzers.meta]\n  runtime_version = "17"`;
+        // Language-specific files
+        const langFiles: Record<string, { dockerfile: string; deepsource: string; pipeline: string; srcFiles: { path: string; content: string }[] }> = {
+          java: {
+            dockerfile: `# Final runtime image\nFROM eclipse-temurin:17-jre-jammy AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\nARG JAVA_JAR\nENV JAVA_JAR=\${JAVA_JAR}\n\nENV JAVA_OPTS=""\nENV TZ=America/Sao_Paulo\n\nENV APP_PORT=8080\n\nEXPOSE 8080\n\nENTRYPOINT ["sh", "-c", "java \${JAVA_OPTS} -jar \${JAVA_JAR}"]`,
+            deepsource: `version = 1\n\n[[analyzers]]\nname = "java"\n\n  [analyzers.meta]\n  runtime_version = "17"`,
+            pipeline: `resources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\n\nextends:\n  template: base-argoit/java/template.yml@argo-code`,
+            srcFiles: [
+              { path: "/pom.xml", content: `<?xml version="1.0" encoding="UTF-8"?>\n<project xmlns="http://maven.apache.org/POM/4.0.0"\n         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">\n    <modelVersion>4.0.0</modelVersion>\n    <parent>\n        <groupId>org.springframework.boot</groupId>\n        <artifactId>spring-boot-starter-parent</artifactId>\n        <version>3.2.0</version>\n        <relativePath/>\n    </parent>\n    <groupId>com.argoit</groupId>\n    <artifactId>${repoName}</artifactId>\n    <version>0.0.1-SNAPSHOT</version>\n    <name>${repoName}</name>\n    <description>Projeto criado pelo IDP ArgoIT</description>\n    <properties>\n        <java.version>17</java.version>\n    </properties>\n    <dependencies>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-web</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-actuator</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-test</artifactId>\n            <scope>test</scope>\n        </dependency>\n    </dependencies>\n    <build>\n        <plugins>\n            <plugin>\n                <groupId>org.springframework.boot</groupId>\n                <artifactId>spring-boot-maven-plugin</artifactId>\n            </plugin>\n        </plugins>\n    </build>\n</project>` },
+              { path: "/src/main/java/com/argoit/Application.java", content: `package com.argoit;\n\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n\n@SpringBootApplication\npublic class Application {\n    public static void main(String[] args) {\n        SpringApplication.run(Application.class, args);\n    }\n}` },
+              { path: "/src/main/java/com/argoit/controller/HealthController.java", content: `package com.argoit.controller;\n\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\nimport java.util.Map;\n\n@RestController\npublic class HealthController {\n\n    @GetMapping("/health")\n    public Map<String, String> health() {\n        return Map.of("status", "UP", "service", "${repoName}");\n    }\n}` },
+              { path: "/src/main/resources/application.yml", content: `server:\n  port: 8080\n\nspring:\n  application:\n    name: ${repoName}\n\nmanagement:\n  endpoints:\n    web:\n      exposure:\n        include: health,info` },
+              { path: "/src/test/java/com/argoit/ApplicationTests.java", content: `package com.argoit;\n\nimport org.junit.jupiter.api.Test;\nimport org.springframework.boot.test.context.SpringBootTest;\n\n@SpringBootTest\nclass ApplicationTests {\n    @Test\n    void contextLoads() {\n    }\n}` },
+              { path: "/.gitignore", content: `target/\n*.class\n*.jar\n*.war\n*.ear\n.idea/\n*.iml\n.DS_Store\n*.log` },
+            ],
+          },
+          python: {
+            dockerfile: `FROM python:3.11-slim\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV PYTHONUNBUFFERED=1\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY src/ ./src/\n\nEXPOSE 8080\n\nCMD ["python", "src/main.py"]`,
+            deepsource: `version = 1\n\n[[analyzers]]\nname = "python"\n\n  [analyzers.meta]\n  runtime_version = "3.x"`,
+            pipeline: `resources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\n\nextends:\n  template: base-argoit/python/template.yml@argo-code`,
+            srcFiles: [
+              { path: "/requirements.txt", content: `fastapi==0.104.1\nuvicorn==0.24.0\npydantic==2.5.0\npytest==7.4.3` },
+              { path: "/src/__init__.py", content: `` },
+              { path: "/src/main.py", content: `from fastapi import FastAPI\nimport uvicorn\n\napp = FastAPI(title="${repoName}", version="0.1.0")\n\n\n@app.get("/health")\ndef health():\n    return {"status": "UP", "service": "${repoName}"}\n\n\n@app.get("/")\ndef root():\n    return {"message": "Bem-vindo ao ${repoName}"}\n\n\nif __name__ == "__main__":\n    uvicorn.run(app, host="0.0.0.0", port=8080)` },
+              { path: "/src/config.py", content: `import os\n\n\nclass Settings:\n    APP_NAME: str = "${repoName}"\n    APP_PORT: int = int(os.getenv("APP_PORT", "8080"))\n    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "dev")\n\n\nsettings = Settings()` },
+              { path: "/tests/__init__.py", content: `` },
+              { path: "/tests/test_main.py", content: `from fastapi.testclient import TestClient\nfrom src.main import app\n\nclient = TestClient(app)\n\n\ndef test_health():\n    response = client.get("/health")\n    assert response.status_code == 200\n    assert response.json()["status"] == "UP"` },
+              { path: "/.gitignore", content: `__pycache__/\n*.py[cod]\n*.egg-info/\ndist/\nbuild/\n.env\n.venv/\nvenv/\n*.log\n.DS_Store` },
+            ],
+          },
+          dotnet: {
+            dockerfile: `FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV ASPNETCORE_URLS=http://+:8080\n\nEXPOSE 8080\n\nCOPY publish/ .\n\nENTRYPOINT ["dotnet", "${repoName}.dll"]`,
+            deepsource: `version = 1\n\n[[analyzers]]\nname = "csharp"`,
+            pipeline: `resources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\n\nextends:\n  template: base-argoit/dotnet/template.yml@argo-code`,
+            srcFiles: [
+              { path: `/src/${repoName}.csproj`, content: `<Project Sdk="Microsoft.NET.Sdk.Web">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n</Project>` },
+              { path: "/src/Program.cs", content: `var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen();\n\nvar app = builder.Build();\n\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}\n\napp.MapGet("/health", () => new { status = "UP", service = "${repoName}" });\n\napp.MapGet("/", () => new { message = "Bem-vindo ao ${repoName}" });\n\napp.Run();` },
+              { path: "/src/appsettings.json", content: `{\n  "Logging": {\n    "LogLevel": {\n      "Default": "Information",\n      "Microsoft.AspNetCore": "Warning"\n    }\n  },\n  "AllowedHosts": "*"\n}` },
+              { path: "/.gitignore", content: `bin/\nobj/\npublish/\n*.user\n*.suo\n.vs/\n*.log\n.DS_Store` },
+            ],
+          },
+        };
 
-        const azurePipelinesContent = `resources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\n\nextends:\n  template: base-argoit/java/template.yml@argo-code`;
+        const langConfig = langFiles[lang] || langFiles.java;
 
-        const changes = [
+        const changes: any[] = [
           {
             changeType: "add",
             item: { path: "/README.md" },
@@ -135,19 +175,28 @@ serve(async (req) => {
           {
             changeType: "add",
             item: { path: "/Dockerfile" },
-            newContent: { content: encode64(dockerfileContent), contentType: "base64encoded" },
+            newContent: { content: encode64(langConfig.dockerfile), contentType: "base64encoded" },
           },
           {
             changeType: "add",
             item: { path: "/.deepsource.toml" },
-            newContent: { content: encode64(deepsourceContent), contentType: "base64encoded" },
+            newContent: { content: encode64(langConfig.deepsource), contentType: "base64encoded" },
           },
           {
             changeType: "add",
             item: { path: "/azure-pipelines.yml" },
-            newContent: { content: encode64(azurePipelinesContent), contentType: "base64encoded" },
+            newContent: { content: encode64(langConfig.pipeline), contentType: "base64encoded" },
           },
         ];
+
+        // Add language-specific src files
+        for (const srcFile of langConfig.srcFiles) {
+          changes.push({
+            changeType: "add",
+            item: { path: srcFile.path },
+            newContent: { content: encode64(srcFile.content), contentType: "base64encoded" },
+          });
+        }
         
         try {
           await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/pushes?api-version=7.1`, {

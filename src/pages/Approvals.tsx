@@ -78,6 +78,7 @@ export default function Approvals() {
           componentId: comp.id,
           projectName: comp.project_name,
           repoName: comp.repo_name || comp.name,
+          language: comp.language,
         }),
       });
 
@@ -130,6 +131,7 @@ export default function Approvals() {
           componentId: comp.id,
           projectName: comp.project_name,
           repoName: comp.repo_name || comp.name,
+          language: comp.language,
         }),
       });
 
