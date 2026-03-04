@@ -127,6 +127,21 @@ serve(async (req) => {
         const readmeContent = `# ${repoName}\n\nRepositório criado automaticamente pelo IDP ArgoIT.\n\n## Branches\n- \`main\` - Branch principal\n- \`develop\` - Branch de desenvolvimento (padrão)\n- \`feature/teste\` - Branch de feature\n- \`release/v1.0\` - Branch de release`;
 
         const lang = (language || 'java').toLowerCase();
+        const templateId = body.templateId || '';
+
+        // .NET version mapping
+        const dotnetVersionMap: Record<string, { runtime: string; sdk: string; tfm: string }> = {
+          '6':  { runtime: '6.0', sdk: '6.0.428',                    tfm: 'net6.0' },
+          '8':  { runtime: '8.0', sdk: '8.0.407',                    tfm: 'net8.0' },
+          '9':  { runtime: '9.0', sdk: '9.0.203',                    tfm: 'net9.0' },
+          '10': { runtime: '10.0-preview', sdk: '10.0.100-rc.2.25502.107', tfm: 'net10.0' },
+        };
+
+        // Extract dotnet version from templateId (e.g. "dotnet8-web-api" -> "8")
+        let dotnetVer = '8';
+        const dotnetMatch = templateId.match(/dotnet(\d+)/);
+        if (dotnetMatch) dotnetVer = dotnetMatch[1];
+        const dv = dotnetVersionMap[dotnetVer] || dotnetVersionMap['8'];
 
         // Language-specific files
         const langFiles: Record<string, { dockerfile: string; deepsource: string; pipeline: string; srcFiles: { path: string; content: string }[] }> = {
@@ -158,11 +173,11 @@ serve(async (req) => {
             ],
           },
           dotnet: {
-            dockerfile: `FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV ASPNETCORE_URLS=http://+:8080\n\nEXPOSE 8080\n\nCOPY publish/ .\n\nENTRYPOINT ["dotnet", "${repoName}.dll"]`,
+            dockerfile: `FROM mcr.microsoft.com/dotnet/aspnet:${dv.runtime} AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV ASPNETCORE_URLS=http://+:8080\n\nEXPOSE 8080\n\nCOPY publish/ .\n\nENTRYPOINT ["dotnet", "${repoName}.dll"]`,
             deepsource: `version = 1\n\n[[analyzers]]\nname = "csharp"`,
-            pipeline: `trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nstages:\n  - template: base-argoit/dotnet/template.yml@code\n    parameters:\n      dotNetVersion: '10.0.100-rc.2.25502.107'`,
+            pipeline: `trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nstages:\n  - template: base-argoit/dotnet/template.yml@code\n    parameters:\n      dotNetVersion: '${dv.sdk}'`,
             srcFiles: [
-              { path: `/src/${repoName}.csproj`, content: `<Project Sdk="Microsoft.NET.Sdk.Web">\n  <PropertyGroup>\n    <TargetFramework>net8.0</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n</Project>` },
+              { path: `/src/${repoName}.csproj`, content: `<Project Sdk="Microsoft.NET.Sdk.Web">\n  <PropertyGroup>\n    <TargetFramework>${dv.tfm}</TargetFramework>\n    <Nullable>enable</Nullable>\n    <ImplicitUsings>enable</ImplicitUsings>\n  </PropertyGroup>\n</Project>` },
               { path: "/src/Program.cs", content: `var builder = WebApplication.CreateBuilder(args);\n\nbuilder.Services.AddEndpointsApiExplorer();\nbuilder.Services.AddSwaggerGen();\n\nvar app = builder.Build();\n\nif (app.Environment.IsDevelopment())\n{\n    app.UseSwagger();\n    app.UseSwaggerUI();\n}\n\napp.MapGet("/health", () => new { status = "UP", service = "${repoName}" });\n\napp.MapGet("/", () => new { message = "Bem-vindo ao ${repoName}" });\n\napp.Run();` },
               { path: "/src/appsettings.json", content: `{\n  "Logging": {\n    "LogLevel": {\n      "Default": "Information",\n      "Microsoft.AspNetCore": "Warning"\n    }\n  },\n  "AllowedHosts": "*"\n}` },
               { path: "/.gitignore", content: `bin/\nobj/\npublish/\n*.user\n*.suo\n.vs/\n*.log\n.DS_Store` },

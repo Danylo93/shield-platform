@@ -91,6 +91,7 @@ export default function Approvals() {
           projectName: comp.project_name,
           repoName: comp.repo_name || comp.name,
           language: comp.language,
+          templateId: comp.template_id,
         }),
       });
 
@@ -143,6 +144,7 @@ export default function Approvals() {
           projectName: comp.project_name,
           repoName: comp.repo_name || comp.name,
           language: comp.language,
+          templateId: comp.template_id,
         }),
       });
 
