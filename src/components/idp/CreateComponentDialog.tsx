@@ -107,18 +107,16 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-1 mb-4 w-full">
+        <div className="grid grid-cols-4 gap-2 mb-4 w-full">
           {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-1 flex-1 min-w-0">
-              <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full transition-colors shrink-0 ${
+            <div key={s.key} className="min-w-0 space-y-1.5">
+              <div className={`h-1 rounded-full transition-colors ${i <= currentStepIndex ? "bg-primary" : "bg-border"}`} />
+              <div className={`flex items-center justify-center gap-1 text-xs font-medium px-2 py-1 rounded-full transition-colors ${
                 i <= currentStepIndex ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
               }`}>
                 {s.icon}
-                <span className="hidden sm:inline text-[11px]">{s.label}</span>
+                <span className="hidden lg:inline truncate">{s.label}</span>
               </div>
-              {i < steps.length - 1 && (
-                <div className={`flex-1 h-px min-w-2 ${i < currentStepIndex ? "bg-primary" : "bg-border"}`} />
-              )}
             </div>
           ))}
         </div>
