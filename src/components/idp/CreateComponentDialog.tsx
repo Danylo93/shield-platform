@@ -214,7 +214,8 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                   rows={3}
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-between">
+                <Button variant="ghost" onClick={() => setStep("project")}>Voltar</Button>
                 <Button onClick={() => setStep("config")} disabled={!canProceedInfo}>
                   Próximo
                 </Button>
