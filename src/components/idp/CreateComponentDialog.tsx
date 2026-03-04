@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Template, languageLabels } from "@/data/templates";
-import { useAzureProjects, AzureProject } from "@/hooks/useAzureDevOps";
+import { useAzureProjects, AzureProject, AzureTemplate } from "@/hooks/useAzureDevOps";
 import {
   Dialog,
   DialogContent,
@@ -19,10 +18,16 @@ import { Rocket, GitBranch, Box, CheckCircle2, FolderOpen, Search, Loader2 } fro
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
+const langLabels: Record<string, string> = {
+  java: "Java",
+  python: "Python",
+  dotnet: ".NET",
+};
+
 interface CreateComponentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  template: Template | null;
+  template: AzureTemplate | null;
 }
 
 type Step = "project" | "info" | "config" | "review";
@@ -80,12 +85,10 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
   const currentStepIndex = steps.findIndex((s) => s.key === step);
 
-  // Generate a color from project name
   const getProjectColor = (name: string) => {
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    const h = hash % 360;
-    return `hsl(${h}, 60%, 50%)`;
+    return `hsl(${hash % 360}, 60%, 50%)`;
   };
 
   return (
@@ -99,23 +102,17 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           <DialogDescription>
             Template: <span className="font-medium text-foreground">{template.name}</span>
             <Badge variant="outline" className="ml-2 text-[10px]">
-              {languageLabels[template.language]}
-              {template.dotnetVersion && ` ${template.dotnetVersion}`}
+              {langLabels[template.language] || template.language}
             </Badge>
           </DialogDescription>
         </DialogHeader>
 
-        {/* Step indicator */}
         <div className="flex items-center gap-2 mb-4">
           {steps.map((s, i) => (
             <div key={s.key} className="flex items-center gap-2 flex-1">
-              <div
-                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full transition-colors ${
-                  i <= currentStepIndex
-                    ? "bg-primary/10 text-primary"
-                    : "bg-muted text-muted-foreground"
-                }`}
-              >
+              <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full transition-colors ${
+                i <= currentStepIndex ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+              }`}>
                 {s.icon}
                 <span className="hidden sm:inline">{s.label}</span>
               </div>
@@ -128,21 +125,10 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
         <AnimatePresence mode="wait">
           {step === "project" && (
-            <motion.div
-              key="project"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-3"
-            >
+            <motion.div key="project" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar projeto no Azure DevOps..."
-                  className="pl-9"
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                />
+                <Input placeholder="Buscar projeto no Azure DevOps..." className="pl-9" value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
               </div>
               <ScrollArea className="h-[280px] pr-2">
                 {loadingProjects ? (
@@ -155,20 +141,12 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                     {filteredProjects.map((project) => {
                       const color = getProjectColor(project.name);
                       return (
-                        <motion.div
-                          key={project.id}
-                          whileHover={{ x: 4 }}
-                          onClick={() => setSelectedProject(project)}
+                        <motion.div key={project.id} whileHover={{ x: 4 }} onClick={() => setSelectedProject(project)}
                           className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                            selectedProject?.id === project.id
-                              ? "bg-primary/10 border border-primary/30"
-                              : "hover:bg-muted/50 border border-transparent"
-                          }`}
-                        >
-                          <div
-                            className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
-                            style={{ backgroundColor: color + "22", color }}
-                          >
+                            selectedProject?.id === project.id ? "bg-primary/10 border border-primary/30" : "hover:bg-muted/50 border border-transparent"
+                          }`}>
+                          <div className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+                            style={{ backgroundColor: color + "22", color }}>
                             {project.abbreviation || project.name.slice(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
@@ -185,88 +163,44 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 )}
               </ScrollArea>
               <div className="flex justify-end pt-2">
-                <Button onClick={() => setStep("info")} disabled={!selectedProject}>
-                  Próximo
-                </Button>
+                <Button onClick={() => setStep("info")} disabled={!selectedProject}>Próximo</Button>
               </div>
             </motion.div>
           )}
 
           {step === "info" && (
-            <motion.div
-              key="info"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
+            <motion.div key="info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
               <div>
                 <Label htmlFor="name">Nome do Componente</Label>
-                <Input
-                  id="name"
-                  placeholder="meu-servico-api"
-                  value={componentName}
-                  onChange={(e) => {
-                    setComponentName(e.target.value);
-                    if (!repoName) setRepoName(e.target.value);
-                  }}
-                  className="mt-1.5"
-                />
+                <Input id="name" placeholder="meu-servico-api" value={componentName}
+                  onChange={(e) => { setComponentName(e.target.value); if (!repoName) setRepoName(e.target.value); }} className="mt-1.5" />
               </div>
               <div>
                 <Label htmlFor="repo">Nome do Repositório (Azure DevOps)</Label>
-                <Input
-                  id="repo"
-                  placeholder="meu-servico-api"
-                  value={repoName}
-                  onChange={(e) => setRepoName(e.target.value)}
-                  className="mt-1.5"
-                />
+                <Input id="repo" placeholder="meu-servico-api" value={repoName} onChange={(e) => setRepoName(e.target.value)} className="mt-1.5" />
               </div>
               <div>
                 <Label htmlFor="desc">Descrição</Label>
-                <Textarea
-                  id="desc"
-                  placeholder="Descreva o propósito deste componente..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1.5 resize-none"
-                  rows={3}
-                />
+                <Textarea id="desc" placeholder="Descreva o propósito deste componente..." value={description}
+                  onChange={(e) => setDescription(e.target.value)} className="mt-1.5 resize-none" rows={3} />
               </div>
               <div className="flex justify-between">
                 <Button variant="ghost" onClick={() => setStep("project")}>Voltar</Button>
-                <Button onClick={() => setStep("config")} disabled={!canProceedInfo}>
-                  Próximo
-                </Button>
+                <Button onClick={() => setStep("config")} disabled={!canProceedInfo}>Próximo</Button>
               </div>
             </motion.div>
           )}
 
           {step === "config" && (
-            <motion.div
-              key="config"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
+            <motion.div key="config" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
               <div>
                 <Label htmlFor="owner">Owner / Squad</Label>
-                <Input
-                  id="owner"
-                  placeholder="squad-platform"
-                  value={owner}
-                  onChange={(e) => setOwner(e.target.value)}
-                  className="mt-1.5"
-                />
+                <Input id="owner" placeholder="squad-platform" value={owner} onChange={(e) => setOwner(e.target.value)} className="mt-1.5" />
               </div>
               <div>
                 <Label>Lifecycle</Label>
                 <Select defaultValue="experimental">
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="experimental">Experimental</SelectItem>
                     <SelectItem value="development">Development</SelectItem>
@@ -277,42 +211,20 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
               </div>
               <div className="flex justify-between">
                 <Button variant="ghost" onClick={() => setStep("info")}>Voltar</Button>
-                <Button onClick={() => setStep("review")} disabled={!canProceedConfig}>
-                  Próximo
-                </Button>
+                <Button onClick={() => setStep("review")} disabled={!canProceedConfig}>Próximo</Button>
               </div>
             </motion.div>
           )}
 
           {step === "review" && (
-            <motion.div
-              key="review"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
-            >
+            <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
               <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Projeto</span>
-                  <span className="font-medium">{selectedProject?.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Componente</span>
-                  <span className="font-medium">{componentName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Repositório</span>
-                  <span className="font-mono text-xs">{repoName}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Template</span>
-                  <span>{template.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Owner</span>
-                  <span>{owner}</span>
-                </div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Projeto</span><span className="font-medium">{selectedProject?.name}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Componente</span><span className="font-medium">{componentName}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Repositório</span><span className="font-mono text-xs">{repoName}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span>{template.name} ({langLabels[template.language] || template.language})</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Path</span><span className="font-mono text-xs">{template.path}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Owner</span><span>{owner}</span></div>
                 {description && (
                   <div className="pt-2 border-t border-border">
                     <span className="text-muted-foreground">Descrição:</span>
@@ -324,20 +236,9 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 <Button variant="ghost" onClick={() => setStep("config")}>Voltar</Button>
                 <Button onClick={handleCreate} disabled={creating} className="gap-2">
                   {creating ? (
-                    <>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                      >
-                        <Rocket className="h-4 w-4" />
-                      </motion.div>
-                      Criando...
-                    </>
+                    <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: "linear" }}><Rocket className="h-4 w-4" /></motion.div>Criando...</>
                   ) : (
-                    <>
-                      <Rocket className="h-4 w-4" />
-                      Criar Componente
-                    </>
+                    <><Rocket className="h-4 w-4" />Criar Componente</>
                   )}
                 </Button>
               </div>
