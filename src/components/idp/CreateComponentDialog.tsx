@@ -274,6 +274,10 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
             >
               <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
                 <div className="flex justify-between">
+                  <span className="text-muted-foreground">Projeto</span>
+                  <span className="font-medium">{selectedProject?.name}</span>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Componente</span>
                   <span className="font-medium">{componentName}</span>
                 </div>
