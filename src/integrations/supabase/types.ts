@@ -14,16 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      components: {
+        Row: {
+          approval_status: string
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          id: string
+          language: string
+          name: string
+          project_name: string
+          rejection_reason: string | null
+          repo_name: string | null
+          repo_url: string | null
+          template_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by: string
+          description?: string | null
+          id?: string
+          language: string
+          name: string
+          project_name: string
+          rejection_reason?: string | null
+          repo_name?: string | null
+          repo_url?: string | null
+          template_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          approval_status?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          id?: string
+          language?: string
+          name?: string
+          project_name?: string
+          rejection_reason?: string | null
+          repo_name?: string | null
+          repo_url?: string | null
+          template_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          full_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          full_name?: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "dev" | "devops"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +254,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["dev", "devops"],
+    },
   },
 } as const
