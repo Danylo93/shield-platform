@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, GitFork, GitBranch, Play, Settings } from "lucide-react";
+import { CheckCircle2, Loader2, GitFork, GitBranch, Play, Settings, Workflow } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -7,7 +7,8 @@ const steps = [
   { key: "pushing_code", label: "Enviando código base", icon: Settings },
   { key: "creating_branches", label: "Criando branches", icon: GitBranch },
   { key: "setting_default_branch", label: "Definindo branch padrão", icon: GitBranch },
-  { key: "running_pipeline", label: "Executando pipeline", icon: Play },
+  { key: "creating_pipeline", label: "Criando pipeline", icon: Workflow },
+  { key: "running_pipeline", label: "Executando pipeline em develop", icon: Play },
   { key: "done", label: "Concluído", icon: CheckCircle2 },
 ];
 
