@@ -264,10 +264,46 @@ serve(async (req) => {
             });
           }
 
-          // Step 5: Running pipeline
+          // Step 5: Create pipeline definition and run on develop
           await updateStep('running_pipeline');
-          // The pipeline runs automatically when azure-pipelines.yml is detected
-          // We just update the step for visual feedback
+          try {
+            // Create pipeline definition pointing to the repo's azure-pipelines.yml
+            const pipelineData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`, {
+              method: 'POST',
+              body: JSON.stringify({
+                name: repoName,
+                folder: '\\',
+                configuration: {
+                  type: 'yaml',
+                  path: '/azure-pipelines.yml',
+                  repository: {
+                    id: repoId,
+                    type: 'azureReposGit',
+                  },
+                },
+              }),
+            });
+
+            console.log('Pipeline created:', pipelineData.id);
+
+            // Run the pipeline on develop branch
+            await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineData.id}/runs?api-version=7.1`, {
+              method: 'POST',
+              body: JSON.stringify({
+                resources: {
+                  repositories: {
+                    self: {
+                      refName: 'refs/heads/develop',
+                    },
+                  },
+                },
+              }),
+            });
+
+            console.log('Pipeline run triggered on develop');
+          } catch (pipelineError) {
+            console.error('Pipeline creation/run warning:', pipelineError);
+          }
           
         } catch (branchError) {
           console.error('Branch/pipeline warning:', branchError);
