@@ -93,7 +93,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
-      <DialogContent className="sm:max-w-2xl w-[95vw] glass">
+      <DialogContent className="sm:max-w-lg w-[95vw] max-w-[95vw] overflow-hidden glass">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
@@ -107,17 +107,17 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-2 mb-4 w-full min-w-0 overflow-x-auto">
+        <div className="flex items-center gap-1 mb-4 w-full">
           {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-2 flex-1 min-w-0">
-              <div className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full transition-colors ${
+            <div key={s.key} className="flex items-center gap-1 flex-1 min-w-0">
+              <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full transition-colors shrink-0 ${
                 i <= currentStepIndex ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
               }`}>
                 {s.icon}
-                <span className="hidden sm:inline">{s.label}</span>
+                <span className="hidden sm:inline text-[11px]">{s.label}</span>
               </div>
               {i < steps.length - 1 && (
-                <div className={`flex-1 h-px ${i < currentStepIndex ? "bg-primary" : "bg-border"}`} />
+                <div className={`flex-1 h-px min-w-2 ${i < currentStepIndex ? "bg-primary" : "bg-border"}`} />
               )}
             </div>
           ))}
