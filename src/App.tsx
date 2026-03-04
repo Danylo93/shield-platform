@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import AppLayout from "./layouts/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import TemplatesPage from "./pages/Templates";
+import Settings from "./pages/Settings";
 import Catalog from "./pages/Catalog";
 import Approvals from "./pages/Approvals";
 import Login from "./pages/Login";
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="/templates" element={<TemplatesPage />} />
               <Route path="/catalog" element={<Catalog />} />
               <Route path="/approvals" element={<Approvals />} />
+              <Route path="/settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
