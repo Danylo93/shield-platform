@@ -115,7 +115,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 i <= currentStepIndex ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
               }`}>
                 {s.icon}
-                <span className="hidden lg:inline truncate">{s.label}</span>
+                <span className="sr-only">{s.label}</span>
               </div>
             </div>
           ))}
