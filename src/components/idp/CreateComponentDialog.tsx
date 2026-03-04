@@ -117,6 +117,61 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
         </div>
 
         <AnimatePresence mode="wait">
+          {step === "project" && (
+            <motion.div
+              key="project"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-3"
+            >
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar projeto..."
+                  className="pl-9"
+                  value={projectSearch}
+                  onChange={(e) => setProjectSearch(e.target.value)}
+                />
+              </div>
+              <ScrollArea className="h-[280px] pr-2">
+                <div className="space-y-1.5">
+                  {filteredProjects.map((project) => (
+                    <motion.div
+                      key={project.id}
+                      whileHover={{ x: 4 }}
+                      onClick={() => setSelectedProject(project)}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedProject?.id === project.id
+                          ? "bg-primary/10 border border-primary/30"
+                          : "hover:bg-muted/50 border border-transparent"
+                      }`}
+                    >
+                      <div
+                        className="h-9 w-9 rounded-lg flex items-center justify-center text-sm font-bold shrink-0"
+                        style={{ backgroundColor: project.color + "22", color: project.color }}
+                      >
+                        {project.abbreviation}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-foreground">{project.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{project.description}</p>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {filteredProjects.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-8">Nenhum projeto encontrado</p>
+                  )}
+                </div>
+              </ScrollArea>
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setStep("info")} disabled={!selectedProject}>
+                  Próximo
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {step === "info" && (
             <motion.div
               key="info"
