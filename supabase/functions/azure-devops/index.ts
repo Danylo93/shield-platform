@@ -264,7 +264,30 @@ serve(async (req) => {
             });
           }
 
-          // Step 5: Create pipeline definition
+          // Step 5: Create environments if they don't exist
+          await updateStep('creating_environments');
+          try {
+            const envNames = ['dev', 'stg', 'rc', 'prd'];
+            // List existing environments
+            const existingEnvs = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`);
+            const existingNames = (existingEnvs.value || []).map((e: any) => e.name.toLowerCase());
+            
+            for (const envName of envNames) {
+              if (!existingNames.includes(envName)) {
+                await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`, {
+                  method: 'POST',
+                  body: JSON.stringify({ name: envName, description: `Ambiente ${envName.toUpperCase()} - criado pelo IDP ArgoIT` }),
+                });
+                console.log(`Environment '${envName}' created`);
+              } else {
+                console.log(`Environment '${envName}' already exists`);
+              }
+            }
+          } catch (envError) {
+            console.error('Environment creation warning:', envError);
+          }
+
+          // Step 6: Create pipeline definition
           await updateStep('creating_pipeline');
           try {
             const pipelineData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`, {
@@ -285,10 +308,8 @@ serve(async (req) => {
 
             console.log('Pipeline created:', pipelineData.id);
 
-            // Step 6: Run pipeline on develop
+            // Step 7: Run pipeline on develop
             await updateStep('running_pipeline');
-
-            // Run the pipeline on develop branch
             await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineData.id}/runs?api-version=7.1`, {
               method: 'POST',
               body: JSON.stringify({
