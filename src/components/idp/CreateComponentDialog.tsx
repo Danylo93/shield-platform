@@ -44,7 +44,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
     setTimeout(() => {
       setCreating(false);
       toast.success(`Componente "${componentName}" criado com sucesso!`, {
-        description: `Repo: ${repoName} • Template: ${template.name}`,
+        description: `Projeto: ${selectedProject?.name} • Repo: ${repoName} • Template: ${template.name}`,
       });
       onOpenChange(false);
       resetForm();
