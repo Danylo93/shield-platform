@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { GitBranch, Search, Loader2, AlertCircle, Clock, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Trash2 } from "lucide-react";
+import { GitBranch, Search, Loader2, AlertCircle, Clock, CheckCircle2, XCircle, ExternalLink, AlertTriangle, Trash2, Box } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,12 @@ const langColors: Record<string, string> = {
   dotnet: "bg-[hsl(var(--dotnet))]/10 text-[hsl(var(--dotnet))]",
 };
 
+const langIcons: Record<string, string> = {
+  java: "☕",
+  python: "🐍",
+  dotnet: "🔷",
+};
+
 export default function Catalog() {
   const { user, isDevOps, profile } = useAuth();
   const [search, setSearch] = useState("");
@@ -58,7 +64,6 @@ export default function Catalog() {
     enabled: !!user,
   });
 
-  // Realtime subscription
   useEffect(() => {
     const channel = supabase
       .channel('catalog-realtime')
@@ -73,7 +78,6 @@ export default function Catalog() {
     mutationFn: async (comp: any) => {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
       const res = await fetch(`${supabaseUrl}/functions/v1/azure-devops?action=delete-repo`, {
         method: 'POST',
         headers: {
@@ -87,7 +91,6 @@ export default function Catalog() {
           repoName: comp.repo_name || comp.name,
         }),
       });
-
       if (!res.ok) {
         const errData = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(errData.error || `HTTP ${res.status}`);
@@ -112,15 +115,21 @@ export default function Catalog() {
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground mb-1">
-          {isDevOps ? "Todos os Componentes" : "Meus Componentes"}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          {isDevOps
-            ? "Visualize todos os componentes da plataforma"
-            : `Componentes criados por você${profile?.squad ? ` e pela ${profile.squad}` : ""}`}
-        </p>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-end justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground mb-1 tracking-tight">
+            {isDevOps ? "Todos os Componentes" : "Meus Componentes"}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            {isDevOps
+              ? "Visualize todos os componentes da plataforma"
+              : `Componentes criados por você${profile?.squad ? ` e pela ${profile.squad}` : ""}`}
+          </p>
+        </div>
+        <Badge variant="outline" className="text-xs gap-1.5 px-3 py-1.5">
+          <Box className="h-3 w-3" />
+          {filtered.length} componentes
+        </Badge>
       </motion.div>
 
       <div className="relative max-w-sm">
@@ -147,10 +156,11 @@ export default function Catalog() {
 
       {!isLoading && !error && (
         <div className="space-y-3">
-          <p className="text-xs text-muted-foreground">{filtered.length} componentes</p>
           {filtered.length === 0 && (
-            <div className="text-center py-16 text-muted-foreground">
-              <GitBranch className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <div className="text-center py-20 text-muted-foreground">
+              <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <GitBranch className="h-8 w-8 opacity-30" />
+              </div>
               <p className="text-sm font-medium">Nenhum componente encontrado</p>
               <p className="text-xs mt-1">Solicite a criação de um componente na página de Templates</p>
             </div>
@@ -166,11 +176,11 @@ export default function Catalog() {
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.03 }}
-                className="glass rounded-xl p-4 space-y-2"
+                className="glass-hover rounded-xl p-4 space-y-2"
               >
                 <div className="flex items-center gap-4">
-                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                    <GitBranch className="h-5 w-5 text-muted-foreground" />
+                  <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center shrink-0 text-lg">
+                    {langIcons[comp.language] || "📦"}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
@@ -193,7 +203,7 @@ export default function Catalog() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive transition-colors"
                       onClick={() => setDeleteTarget(comp)}
                     >
                       <Trash2 className="h-4 w-4" />
@@ -201,21 +211,19 @@ export default function Catalog() {
                   )}
                 </div>
 
-                {/* Show repo link when created */}
                 {comp.repo_url && comp.approval_status === "created" && (
-                  <div className="flex items-center gap-2 ml-14 p-2 rounded-lg bg-success/5 border border-success/20">
+                  <div className="flex items-center gap-2 ml-14 p-2.5 rounded-lg bg-success/5 border border-success/20">
                     <GitBranch className="h-3.5 w-3.5 text-success shrink-0" />
                     <a href={comp.repo_url} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-success hover:underline truncate flex items-center gap-1">
+                      className="text-xs text-success hover:underline truncate flex items-center gap-1 font-medium">
                       Acessar Repositório
                       <ExternalLink className="h-3 w-3 shrink-0" />
                     </a>
                   </div>
                 )}
 
-                {/* Show error */}
                 {comp.approval_status === "error" && comp.rejection_reason && (
-                  <div className="flex items-center gap-2 ml-14 p-2 rounded-lg bg-destructive/5 border border-destructive/20">
+                  <div className="flex items-center gap-2 ml-14 p-2.5 rounded-lg bg-destructive/5 border border-destructive/20">
                     <AlertTriangle className="h-3.5 w-3.5 text-destructive shrink-0" />
                     <p className="text-xs text-destructive truncate">{comp.rejection_reason}</p>
                   </div>
@@ -226,7 +234,6 @@ export default function Catalog() {
         </div>
       )}
 
-      {/* Delete confirmation dialog */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
