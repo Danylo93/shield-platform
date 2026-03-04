@@ -25,10 +25,12 @@ interface CreateComponentDialogProps {
   template: Template | null;
 }
 
-type Step = "info" | "config" | "review";
+type Step = "project" | "info" | "config" | "review";
 
 export function CreateComponentDialog({ open, onOpenChange, template }: CreateComponentDialogProps) {
-  const [step, setStep] = useState<Step>("info");
+  const [step, setStep] = useState<Step>("project");
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projectSearch, setProjectSearch] = useState("");
   const [componentName, setComponentName] = useState("");
   const [repoName, setRepoName] = useState("");
   const [description, setDescription] = useState("");
