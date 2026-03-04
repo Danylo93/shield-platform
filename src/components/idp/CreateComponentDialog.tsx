@@ -93,7 +93,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) resetForm(); }}>
-      <DialogContent className="sm:max-w-lg w-[95vw] max-w-[95vw] overflow-hidden glass">
+      <DialogContent className="sm:max-w-lg w-[95vw] max-w-[95vw] overflow-hidden glass [&>*]:min-w-0">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Rocket className="h-5 w-5 text-primary" />
@@ -123,7 +123,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
 
         <AnimatePresence mode="wait">
           {step === "project" && (
-            <motion.div key="project" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3">
+            <motion.div key="project" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-3 w-full min-w-0">
               <div className="relative">
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Buscar projeto no Azure DevOps..." className="pl-9" value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
@@ -167,7 +167,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           )}
 
           {step === "info" && (
-            <motion.div key="info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+            <motion.div key="info" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4 w-full min-w-0">
               <div>
                 <Label htmlFor="name">Nome do Componente</Label>
                 <Input id="name" placeholder="meu-servico-api" value={componentName}
@@ -190,7 +190,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           )}
 
           {step === "config" && (
-            <motion.div key="config" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+            <motion.div key="config" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4 w-full min-w-0">
               <div>
                 <Label htmlFor="owner">Owner / Squad</Label>
                 <Input id="owner" placeholder="squad-platform" value={owner} onChange={(e) => setOwner(e.target.value)} className="mt-1.5" />
@@ -215,7 +215,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
           )}
 
           {step === "review" && (
-            <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4">
+            <motion.div key="review" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-4 w-full min-w-0">
               <div className="rounded-lg bg-muted/50 p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">Projeto</span><span className="font-medium">{selectedProject?.name}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Componente</span><span className="font-medium">{componentName}</span></div>
