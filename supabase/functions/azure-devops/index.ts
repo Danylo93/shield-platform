@@ -78,7 +78,13 @@ serve(async (req) => {
       const repo = url.searchParams.get('repo') || 'argo-code';
       const basePath = url.searchParams.get('path') || '/base-argoit';
 
-      // Get full tree with recursion
+      // First, get the repo default branch to use in items call
+      const repoEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}?api-version=7.1`;
+      const repoData = await azureFetch(repoEndpoint);
+      const defaultBranch = repoData.defaultBranch || 'refs/heads/main';
+      console.log('Repo default branch:', defaultBranch);
+
+      // Get full tree with recursion, specifying version
       const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(basePath)}&recursionLevel=Full&includeContentMetadata=true&api-version=7.1`;
       const data = await azureFetch(itemsEndpoint);
       
