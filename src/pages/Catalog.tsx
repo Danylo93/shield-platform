@@ -1,67 +1,94 @@
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, GitBranch, Clock, CheckCircle2 } from "lucide-react";
-
-const components = [
-  { name: "payment-api", language: "Java", owner: "squad-payments", lifecycle: "production", lastDeploy: "2h atrás", repo: "payment-api" },
-  { name: "user-service", language: ".NET 8", owner: "squad-identity", lifecycle: "production", lastDeploy: "5h atrás", repo: "user-service" },
-  { name: "notification-worker", language: "Python", owner: "squad-platform", lifecycle: "production", lastDeploy: "1d atrás", repo: "notification-worker" },
-  { name: "catalog-api", language: ".NET 9", owner: "squad-catalog", lifecycle: "development", lastDeploy: "3h atrás", repo: "catalog-api" },
-  { name: "analytics-pipeline", language: "Python", owner: "squad-data", lifecycle: "experimental", lastDeploy: "6h atrás", repo: "analytics-pipeline" },
-  { name: "order-service", language: "Java", owner: "squad-orders", lifecycle: "production", lastDeploy: "30min atrás", repo: "order-service" },
-];
-
-const lifecycleColor: Record<string, string> = {
-  production: "bg-success/15 text-success border-success/30",
-  development: "bg-primary/15 text-primary border-primary/30",
-  experimental: "bg-warning/15 text-warning border-warning/30",
-  deprecated: "bg-destructive/15 text-destructive border-destructive/30",
-};
+import { ExternalLink, GitBranch, Search, Loader2, AlertCircle } from "lucide-react";
+import { useAzureRepos } from "@/hooks/useAzureDevOps";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 export default function Catalog() {
+  const { data: repos, isLoading, error } = useAzureRepos();
+  const [search, setSearch] = useState("");
+
+  const filtered = (repos || []).filter((r) =>
+    r.name.toLowerCase().includes(search.toLowerCase()) ||
+    r.project.name.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-foreground mb-1">Catálogo de Componentes</h1>
-        <p className="text-muted-foreground text-sm">Todos os serviços e componentes registrados</p>
+        <p className="text-muted-foreground text-sm">Repositórios reais do Azure DevOps</p>
       </motion.div>
 
-      <div className="space-y-3">
-        {components.map((comp, i) => (
-          <motion.div
-            key={comp.name}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="glass rounded-xl p-4 flex items-center justify-between gap-4 hover:glow-primary transition-shadow cursor-pointer group"
-          >
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                <GitBranch className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="min-w-0">
-                <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
-                  {comp.name}
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  {comp.owner} • {comp.language}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <Badge variant="outline" className={`text-[10px] ${lifecycleColor[comp.lifecycle]}`}>
-                <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
-                {comp.lifecycle}
-              </Badge>
-              <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                {comp.lastDeploy}
-              </div>
-              <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-            </div>
-          </motion.div>
-        ))}
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Buscar repositório ou projeto..."
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
+
+      {isLoading && (
+        <div className="flex items-center justify-center py-20 gap-3 text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Carregando repositórios do Azure DevOps...</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-center gap-3 p-4 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive">
+          <AlertCircle className="h-5 w-5 shrink-0" />
+          <div>
+            <p className="font-semibold text-sm">Erro ao carregar repositórios</p>
+            <p className="text-xs mt-0.5">{(error as Error).message}</p>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && !error && (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">{filtered.length} repositórios encontrados</p>
+          {filtered.map((repo, i) => (
+            <motion.a
+              key={repo.id}
+              href={repo.webUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.02 }}
+              className="glass rounded-xl p-4 flex items-center justify-between gap-4 hover:glow-primary transition-shadow cursor-pointer group block"
+            >
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                  <GitBranch className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                    {repo.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {repo.project.name}
+                    {repo.defaultBranch && ` • ${repo.defaultBranch.replace("refs/heads/", "")}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <Badge variant="outline" className="text-[10px]">
+                  {repo.project.name}
+                </Badge>
+                <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </motion.a>
+          ))}
+          {filtered.length === 0 && !isLoading && (
+            <p className="text-sm text-muted-foreground text-center py-8">Nenhum repositório encontrado</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
