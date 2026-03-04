@@ -28,13 +28,12 @@ serve(async (req) => {
   const baseUrl = `https://dev.azure.com/${AZURE_DEVOPS_ORG}`;
 
   async function azureFetch(endpoint: string) {
-    console.log('Fetching:', endpoint);
     const res = await fetch(endpoint, {
       headers: { 'Authorization': authHeader },
     });
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(`Azure DevOps API error [${res.status}]: ${text}`);
+      throw new Error(`Azure DevOps API [${res.status}]: ${text}`);
     }
     return res.json();
   }
@@ -61,76 +60,109 @@ serve(async (req) => {
       });
     }
 
-    if (action === 'tree') {
-      const project = url.searchParams.get('project') || 'Devops';
-      const repo = url.searchParams.get('repo') || 'argo-code';
-      const path = url.searchParams.get('path') || '/base-argoit';
-      
-      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(path)}&recursionLevel=Full&includeContentMetadata=true&api-version=7.1`;
-      const data = await azureFetch(itemsEndpoint);
-      return new Response(JSON.stringify(data), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     if (action === 'templates') {
       const project = url.searchParams.get('project') || 'Devops';
       const repo = url.searchParams.get('repo') || 'argo-code';
       const basePath = url.searchParams.get('path') || '/base-argoit';
 
-      // First, get the repo default branch to use in items call
-      const repoEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}?api-version=7.1`;
-      const repoData = await azureFetch(repoEndpoint);
-      const defaultBranch = repoData.defaultBranch || 'refs/heads/main';
-      console.log('Repo default branch:', defaultBranch);
+      // Step 1: Get repo info (including default branch)
+      const repoInfo = await azureFetch(
+        `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}?api-version=7.1`
+      );
+      const repoId = repoInfo.id;
+      const branch = (repoInfo.defaultBranch || 'refs/heads/main').replace('refs/heads/', '');
+      console.log(`Repo: ${repo}, id: ${repoId}, branch: ${branch}`);
 
-      // Get full tree with recursion, specifying version
-      const branchName = defaultBranch.replace('refs/heads/', '');
-      const itemsEndpoint = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repo)}/items?scopePath=${encodeURIComponent(basePath)}&recursionLevel=Full&includeContentMetadata=true&versionDescriptor.version=${encodeURIComponent(branchName)}&versionDescriptor.versionType=branch&api-version=7.1`;
-      const data = await azureFetch(itemsEndpoint);
+      // Step 2: Get the latest commit on the branch
+      const commitsData = await azureFetch(
+        `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${repoId}/commits?searchCriteria.itemVersion.version=${encodeURIComponent(branch)}&$top=1&api-version=7.1`
+      );
       
-      const items = data.value || [];
-      console.log(`Total items from Azure: ${items.length}`);
-      if (items.length > 0) {
-        console.log('Sample item:', JSON.stringify(items[0]));
-        console.log('Sample item keys:', Object.keys(items[0]));
+      if (!commitsData.value || commitsData.value.length === 0) {
+        throw new Error('No commits found in repo');
       }
+      const latestCommitId = commitsData.value[0].commitId;
+      console.log(`Latest commit: ${latestCommitId}`);
+
+      // Step 3: Get the tree for that commit (full recursive tree)
+      const treeData = await azureFetch(
+        `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${repoId}/trees/${latestCommitId}?recursive=true&api-version=7.1`
+      );
+
+      // Wait - trees endpoint needs a treeId, not commitId
+      // Let's use Items API with the repo ID instead of name
+      // Try: get items listing with the full tree
+      const itemsUrl = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${repoId}/items?scopePath=${encodeURIComponent(basePath)}&recursionLevel=Full&api-version=7.1`;
+      console.log('Items URL:', itemsUrl);
+      
+      let data;
+      try {
+        data = await azureFetch(itemsUrl);
+      } catch (itemsError) {
+        console.error('Items API failed:', itemsError);
+        // Try without leading slash
+        const altPath = basePath.startsWith('/') ? basePath.substring(1) : basePath;
+        const altUrl = `${baseUrl}/${encodeURIComponent(project)}/_apis/git/repositories/${repoId}/items?scopePath=${encodeURIComponent(altPath)}&recursionLevel=Full&api-version=7.1`;
+        console.log('Trying alt URL:', altUrl);
+        data = await azureFetch(altUrl);
+      }
+
+      // Handle both array and object responses
+      let items: any[] = [];
+      if (Array.isArray(data)) {
+        items = data;
+      } else if (data.value) {
+        items = data.value;
+      } else if (data.treeEntries) {
+        items = data.treeEntries;
+      }
+      
+      console.log(`Got ${items.length} items. First 5:`, JSON.stringify(items.slice(0, 5)));
 
       const langNames = ['dotnet', 'java', 'python'];
       const templates: any[] = [];
       const seenPaths = new Set<string>();
 
       for (const item of items) {
-        // Skip root
-        if (item.path === basePath) continue;
+        const itemPath = item.path || item.relativePath || '';
+        if (itemPath === basePath || itemPath === basePath.substring(1)) continue;
         
-        const relativePath = item.path.substring(basePath.length + 1);
+        // Normalize path
+        const normalizedBase = basePath.startsWith('/') ? basePath : '/' + basePath;
+        const normalizedPath = itemPath.startsWith('/') ? itemPath : '/' + itemPath;
+        
+        if (!normalizedPath.startsWith(normalizedBase + '/')) continue;
+        
+        const relativePath = normalizedPath.substring(normalizedBase.length + 1);
         const parts = relativePath.split('/');
 
-        // Check if this is a folder (gitObjectType === 'tree' OR isFolder === true OR no content metadata)
         const isFolder = item.gitObjectType === 'tree' || item.isFolder === true || 
-          (item.contentMetadata === undefined && !item.path.includes('.'));
+          item.folder === true || (item.size === undefined && !relativePath.includes('.'));
 
-        // Template = 2-level deep folder under a language folder: e.g. dotnet/api-template
-        if (parts.length === 2 && langNames.includes(parts[0]) && isFolder && !seenPaths.has(item.path)) {
-          seenPaths.add(item.path);
+        // 2-level: language/template-name
+        if (parts.length === 2 && langNames.includes(parts[0]) && isFolder && !seenPaths.has(normalizedPath)) {
+          seenPaths.add(normalizedPath);
           templates.push({
             id: item.objectId || `${parts[0]}-${parts[1]}`,
             name: parts[1],
             language: parts[0],
-            path: item.path,
+            path: normalizedPath,
             repoName: repo,
             project: project,
           });
         }
       }
 
-      // Fallback: if no 2-level templates, treat language folders as templates
+      // Fallback: language folders themselves
       if (templates.length === 0) {
-        console.log('No sub-templates found, using language folders as templates');
         for (const item of items) {
-          if (item.path === basePath) continue;
-          const relativePath = item.path.substring(basePath.length + 1);
+          const itemPath = item.path || item.relativePath || '';
+          const normalizedBase = basePath.startsWith('/') ? basePath : '/' + basePath;
+          const normalizedPath = itemPath.startsWith('/') ? itemPath : '/' + itemPath;
+          
+          if (!normalizedPath.startsWith(normalizedBase + '/')) continue;
+          
+          const relativePath = normalizedPath.substring(normalizedBase.length + 1);
           const parts = relativePath.split('/');
           
           if (parts.length === 1 && langNames.includes(parts[0])) {
@@ -138,7 +170,7 @@ serve(async (req) => {
               id: item.objectId || parts[0],
               name: `Base ${parts[0].charAt(0).toUpperCase() + parts[0].slice(1)}`,
               language: parts[0],
-              path: item.path,
+              path: normalizedPath,
               repoName: repo,
               project: project,
             });
@@ -147,12 +179,15 @@ serve(async (req) => {
       }
 
       console.log(`Returning ${templates.length} templates`);
-      return new Response(JSON.stringify({ value: templates, _debug: { totalItems: items.length, samplePaths: items.slice(0, 10).map((i: any) => ({ path: i.path, gitObjectType: i.gitObjectType, isFolder: i.isFolder })) } }), {
+      return new Response(JSON.stringify({ 
+        value: templates,
+        _meta: { totalItems: items.length, branch, repoId }
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({ error: 'Invalid action. Use: projects, repos, templates, tree' }), {
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: unknown) {
