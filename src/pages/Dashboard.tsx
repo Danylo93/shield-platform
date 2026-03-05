@@ -73,7 +73,7 @@ export default function Dashboard() {
         <StatsCard title="Repositórios" value={repos?.length ?? "..."} subtitle="Azure DevOps" icon={Layers} color="primary" index={0} />
         <StatsCard title="Templates" value={templates?.length ?? "..."} subtitle="Disponíveis" icon={GitFork} color="accent" index={1} />
         <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
-        <StatsCard title="Deploys" value={156} subtitle="últimos 30 dias" icon={Activity} color="warning" index={3} />
+        <StatsCard title="Deploys" value={"—"} subtitle="em breve" icon={Activity} color="warning" index={3} />
       </div>
 
       {/* Templates */}
