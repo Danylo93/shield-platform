@@ -7,7 +7,7 @@ import { CreateComponentDialog } from "@/components/idp/CreateComponentDialog";
 import { StatsCard } from "@/components/idp/StatsCard";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useAzureRepos, useAzureProjects, useAzureTemplates, AzureTemplate } from "@/hooks/useAzureDevOps";
+import { useAzureRepos, useAzureProjects, useAzureTemplates, useAzureDeployStats, AzureTemplate } from "@/hooks/useAzureDevOps";
 import { Loader2 } from "lucide-react";
 
 export default function Dashboard() {
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const { data: repos } = useAzureRepos();
   const { data: projects } = useAzureProjects();
   const { data: templates, isLoading: loadingTemplates } = useAzureTemplates();
+  const { data: deployCount } = useAzureDeployStats();
 
   const handleUseTemplate = (template: AzureTemplate) => {
     setSelectedTemplate(template);
@@ -77,7 +78,7 @@ export default function Dashboard() {
         {isDevOps && (
           <>
             <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
-            <StatsCard title="Deploys" value={"—"} subtitle="em breve" icon={Activity} color="warning" index={3} />
+            <StatsCard title="Deploys" value={deployCount ?? "..."} subtitle="últimos 30 dias" icon={Activity} color="warning" index={3} />
           </>
         )}
       </div>

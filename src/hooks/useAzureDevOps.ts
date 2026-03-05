@@ -90,3 +90,14 @@ export function useAzureTemplates() {
     staleTime: 30 * 1000, // 30 seconds for debugging
   });
 }
+
+export function useAzureDeployStats() {
+  return useQuery({
+    queryKey: ["azure-deploy-stats"],
+    queryFn: async () => {
+      const data = await fetchFromAzure("deploy-stats");
+      return data.total as number;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
