@@ -1,0 +1,142 @@
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+      - release/*
+      - feature/*
+
+pool:
+  name: 'wakanda-agent-pool'
+
+variables:
+  - name: nodeVersion
+    value: '20'
+  - name: buildConfiguration
+    value: 'production'
+
+stages:
+  - stage: CI
+    displayName: 'CI - Build & Test'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build and Test Application'
+        steps:
+          - checkout: self
+            displayName: 'Checkout shield-platform'
+
+          - task: UseNode@1
+            displayName: 'Setup Node.js $(nodeVersion)'
+            inputs:
+              version: '$(nodeVersion).x'
+
+          - script: |
+              npm ci
+            displayName: 'Install Dependencies'
+
+          - script: |
+              npm run lint
+            displayName: 'Lint'
+            continueOnError: true
+
+          - script: |
+              npm run test
+            displayName: 'Run Unit Tests'
+            continueOnError: true
+
+          - script: |
+              npm run build
+            displayName: 'Build Application'
+
+          - task: PublishPipelineArtifact@1
+            displayName: 'Publish Build Artifact'
+            inputs:
+              targetPath: '$(System.DefaultWorkingDirectory)/dist'
+              artifact: 'shield-platform-dist'
+              publishLocation: 'pipeline'
+
+  - stage: DeployDev
+    displayName: 'Deploy to Dev'
+    dependsOn: CI
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
+    jobs:
+      - deployment: DeployDev
+        displayName: 'Deploy to Dev Environment'
+        environment: 'dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: 'shield-platform-dist'
+                  displayName: 'Download Build Artifact'
+
+                - script: |
+                    echo "🛡️ Deploying S.H.I.E.L.D Platform to DEV..."
+                    echo "Artifact path: $(Pipeline.Workspace)/shield-platform-dist"
+                    # Adicione aqui o comando de deploy para o ambiente dev
+                    # Ex: az storage blob upload-batch, scp, rsync, docker push, etc.
+                  displayName: 'Deploy to Dev'
+
+  - stage: DeployStg
+    displayName: 'Deploy to Staging'
+    dependsOn: DeployDev
+    condition: succeeded()
+    jobs:
+      - deployment: DeployStg
+        displayName: 'Deploy to Staging Environment'
+        environment: 'stg'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: 'shield-platform-dist'
+                  displayName: 'Download Build Artifact'
+
+                - script: |
+                    echo "🛡️ Deploying S.H.I.E.L.D Platform to STG..."
+                    # Adicione aqui o comando de deploy para staging
+                  displayName: 'Deploy to Staging'
+
+  - stage: DeployRC
+    displayName: 'Deploy to RC'
+    dependsOn: DeployStg
+    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
+    jobs:
+      - deployment: DeployRC
+        displayName: 'Deploy to RC Environment'
+        environment: 'rc'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: 'shield-platform-dist'
+                  displayName: 'Download Build Artifact'
+
+                - script: |
+                    echo "🛡️ Deploying S.H.I.E.L.D Platform to RC..."
+                    # Adicione aqui o comando de deploy para RC
+                  displayName: 'Deploy to RC'
+
+  - stage: DeployPrd
+    displayName: 'Deploy to Production'
+    dependsOn: DeployRC
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployPrd
+        displayName: 'Deploy to Production Environment'
+        environment: 'prd'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - download: current
+                  artifact: 'shield-platform-dist'
+                  displayName: 'Download Build Artifact'
+
+                - script: |
+                    echo "🛡️ Deploying S.H.I.E.L.D Platform to PRODUCTION..."
+                    # Adicione aqui o comando de deploy para produção
+                  displayName: 'Deploy to Production'
