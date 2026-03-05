@@ -266,9 +266,9 @@ serve(async (req) => {
 
           // Step 5: Create environments if they don't exist
           await updateStep('creating_environments');
+          const envResults: string[] = [];
           try {
             const envNames = ['dev', 'stg', 'rc', 'prd'];
-            // List existing environments
             const existingEnvs = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`);
             const existingNames = (existingEnvs.value || []).map((e: any) => e.name.toLowerCase());
             
@@ -276,16 +276,22 @@ serve(async (req) => {
               if (!existingNames.includes(envName)) {
                 await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`, {
                   method: 'POST',
-                  body: JSON.stringify({ name: envName, description: `Ambiente ${envName.toUpperCase()} - criado pelo IDP ArgoIT` }),
+                  body: JSON.stringify({ name: envName, description: `Ambiente ${envName.toUpperCase()} - criado pelo S.H.I.E.L.D Platform` }),
                 });
+                envResults.push(`${envName}=criado`);
                 console.log(`Environment '${envName}' created`);
               } else {
+                envResults.push(`${envName}=existente`);
                 console.log(`Environment '${envName}' already exists`);
               }
             }
           } catch (envError) {
             console.error('Environment creation warning:', envError);
           }
+          // Store env results detail
+          await supabaseAdmin.from('components').update({
+            creation_step: `creating_environments:${envResults.join(',')}`,
+          }).eq('id', componentId);
 
           // Step 6: Create pipeline definition
           await updateStep('creating_pipeline');
