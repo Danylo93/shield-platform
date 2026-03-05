@@ -1,7 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/idp/AppSidebar";
-import { Sparkles } from "lucide-react";
+import { Shield } from "lucide-react";
 
 export default function AppLayout() {
   return (
@@ -14,7 +14,7 @@ export default function AppLayout() {
             <div className="flex-1" />
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <div className="h-2 w-2 rounded-full bg-success animate-pulse" />
-              <span className="hidden sm:inline">Online</span>
+              <span className="hidden sm:inline tracking-wider uppercase text-[10px]">Sistemas Operacionais</span>
             </div>
           </header>
           <main className="flex-1 overflow-auto">
