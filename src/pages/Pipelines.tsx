@@ -57,15 +57,18 @@ async function postAzure(action: string, body: Record<string, any>) {
   return res.json();
 }
 
-function RunStatusBadge({ status }: { status: string }) {
-  const s = status?.toLowerCase();
-  if (s === "completed")
+function RunStatusBadge({ state, result }: { state: string; result?: string }) {
+  const s = state?.toLowerCase();
+  const r = result?.toLowerCase();
+  if (s === "completed" && r === "succeeded")
     return <Badge className="bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] border-[hsl(var(--success))]/30 gap-1"><CheckCircle2 className="h-3 w-3" />Sucesso</Badge>;
-  if (s === "failed" || s === "canceled")
-    return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />{s === "failed" ? "Falhou" : "Cancelado"}</Badge>;
+  if (s === "completed" && (r === "failed" || r === "canceled"))
+    return <Badge variant="destructive" className="gap-1"><XCircle className="h-3 w-3" />{r === "failed" ? "Falhou" : "Cancelado"}</Badge>;
+  if (s === "completed" && r === "partiallysucceeded")
+    return <Badge className="bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30 gap-1"><XCircle className="h-3 w-3" />Parcial</Badge>;
   if (s === "inprogress" || s === "notstarted")
     return <Badge className="bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/30 gap-1"><Loader2 className="h-3 w-3 animate-spin" />Em execução</Badge>;
-  return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" />{status || "Desconhecido"}</Badge>;
+  return <Badge variant="outline" className="gap-1"><Clock className="h-3 w-3" />{state || "Desconhecido"}</Badge>;
 }
 
 export default function PipelinesPage() {
@@ -295,7 +298,7 @@ export default function PipelinesPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium text-foreground">#{run.id}</span>
-                            <RunStatusBadge status={run.state} />
+                            <RunStatusBadge state={run.state} result={run.result} />
                           </div>
                           <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                             {run.resources?.repositories?.self?.refName && (
