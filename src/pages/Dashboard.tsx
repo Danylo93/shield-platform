@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Layers, GitFork, Users, Activity, Plus, ArrowRight, Zap } from "lucide-react";
+import { Layers, GitFork, Users, Activity, Plus, ArrowRight, Shield } from "lucide-react";
 import { TemplateCard } from "@/components/idp/TemplateCard";
 import { CreateComponentDialog } from "@/components/idp/CreateComponentDialog";
 import { StatsCard } from "@/components/idp/StatsCard";
@@ -32,22 +32,21 @@ export default function Dashboard() {
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative overflow-hidden rounded-2xl gradient-hero border border-border/30 p-8 lg:p-10"
+        className="relative overflow-hidden rounded-2xl gradient-hero border border-border/30 p-8 lg:p-10 tactical-grid"
       >
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDIwMjAiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50" />
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-4">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Zap className="h-4 w-4 text-primary" />
+            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+              <Shield className="h-5 w-5 text-primary" />
             </div>
-            <span className="text-xs font-medium text-primary uppercase tracking-wider">Developer Platform</span>
+            <span className="text-xs font-bold text-primary uppercase tracking-[0.2em] font-display">S.H.I.E.L.D Platform</span>
           </div>
-          <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-3 tracking-tight">
-            Bem-vindo ao <span className="text-gradient">DevPortal</span>
+          <h1 className="text-3xl lg:text-4xl font-bold text-foreground mb-3 tracking-tight font-display">
+            Central de <span className="text-gradient-shield">Comando</span>
           </h1>
           <p className="text-muted-foreground max-w-xl leading-relaxed">
-            Crie componentes a partir de templates prontos, gerencie seus serviços e acelere
-            o desenvolvimento com nossa plataforma interna.
+            Crie componentes a partir de protocolos aprovados, gerencie seus serviços e acelere
+            o desenvolvimento com a plataforma S.H.I.E.L.D.
           </p>
           <div className="flex gap-3 mt-8">
             <Button className="gap-2 h-11 px-6 shadow-lg shadow-primary/20" onClick={() => navigate("/templates")}>
@@ -61,18 +60,18 @@ export default function Dashboard() {
           </div>
         </div>
         <motion.div
-          className="absolute right-8 top-8 opacity-[0.06]"
+          className="absolute right-8 top-8 opacity-[0.04]"
           animate={{ y: [0, -8, 0], rotate: [0, 5, 0] }}
           transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
         >
-          <GitFork className="h-40 w-40 text-primary" />
+          <Shield className="h-48 w-48 text-primary" />
         </motion.div>
       </motion.div>
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard title="Repositórios" value={repos?.length ?? "..."} subtitle="Azure DevOps" icon={Layers} color="primary" index={0} />
-        <StatsCard title="Templates" value={templates?.length ?? "..."} subtitle="argo-code" icon={GitFork} color="accent" index={1} />
+        <StatsCard title="Protocolos" value={templates?.length ?? "..."} subtitle="Templates" icon={GitFork} color="accent" index={1} />
         <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
         <StatsCard title="Deploys" value={156} subtitle="últimos 30 dias" icon={Activity} color="warning" index={3} />
       </div>
@@ -81,8 +80,8 @@ export default function Dashboard() {
       <div>
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Templates em Destaque</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Comece rapidamente com templates prontos para produção</p>
+            <h2 className="text-lg font-semibold text-foreground font-display tracking-wide">Protocolos em Destaque</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Inicie operações com protocolos aprovados para produção</p>
           </div>
           <Button variant="ghost" size="sm" className="gap-1 text-primary hover:text-primary" onClick={() => navigate("/templates")}>
             Ver todos
@@ -92,7 +91,7 @@ export default function Dashboard() {
         {loadingTemplates ? (
           <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Carregando templates...</span>
+            <span className="text-sm">Carregando protocolos...</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
