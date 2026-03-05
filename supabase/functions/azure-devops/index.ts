@@ -86,12 +86,14 @@ serve(async (req) => {
       }
 
       const supabaseAdmin = getSupabaseAdmin();
+      const creationDetails: Record<string, any> = {};
 
       // Helper to update creation step
       async function updateStep(step: string) {
         await supabaseAdmin.from('components').update({
           approval_status: 'creating',
           creation_step: step,
+          creation_details: creationDetails,
         }).eq('id', componentId);
       }
 
@@ -101,14 +103,27 @@ serve(async (req) => {
         const projectData = await azureFetch(`${baseUrl}/_apis/projects/${encodeURIComponent(projectName)}?api-version=7.1`);
         const projectId = projectData.id;
 
-        // 2. Create the repository
-        const repoData = await azureFetch(`${baseUrl}/_apis/git/repositories?api-version=7.1`, {
-          method: 'POST',
-          body: JSON.stringify({
-            name: repoName,
-            project: { id: projectId },
-          }),
-        });
+        // Check if repo already exists
+        let repoData: any;
+        let repoCreated = false;
+        try {
+          repoData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${encodeURIComponent(repoName)}?api-version=7.1`);
+          repoCreated = false;
+          console.log(`Repo '${repoName}' already exists`);
+        } catch {
+          // Repo doesn't exist, create it
+          repoData = await azureFetch(`${baseUrl}/_apis/git/repositories?api-version=7.1`, {
+            method: 'POST',
+            body: JSON.stringify({
+              name: repoName,
+              project: { id: projectId },
+            }),
+          });
+          repoCreated = true;
+          console.log(`Repo '${repoName}' created`);
+        }
+
+        creationDetails.repo = { status: repoCreated ? 'criado' : 'existente', name: repoName };
 
         const repoUrl = repoData.webUrl || repoData.remoteUrl;
         const repoId = repoData.id;
@@ -232,9 +247,13 @@ serve(async (req) => {
 
           // Step 3: Creating branches
           await updateStep('creating_branches');
-          const refsData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?filter=heads/main&api-version=7.1`);
-          const mainRef = refsData.value?.[0];
+          const refsData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?filter=heads/&api-version=7.1`);
+          const existingBranches = (refsData.value || []).map((r: any) => r.name);
+          const mainRef = refsData.value?.find((r: any) => r.name === 'refs/heads/main');
           
+          const branchDetails: Record<string, string> = {};
+          branchDetails['main'] = existingBranches.includes('refs/heads/main') ? 'existente' : 'criada';
+
           if (mainRef) {
             const mainObjectId = mainRef.objectId;
             const branchesToCreate = [
@@ -243,16 +262,30 @@ serve(async (req) => {
               "refs/heads/release/v1.0",
             ];
 
-            const refUpdates = branchesToCreate.map(name => ({
-              name,
-              oldObjectId: "0000000000000000000000000000000000000000",
-              newObjectId: mainObjectId,
-            }));
+            const refUpdates: any[] = [];
+            for (const name of branchesToCreate) {
+              const shortName = name.replace('refs/heads/', '');
+              if (existingBranches.includes(name)) {
+                branchDetails[shortName] = 'existente';
+              } else {
+                refUpdates.push({
+                  name,
+                  oldObjectId: "0000000000000000000000000000000000000000",
+                  newObjectId: mainObjectId,
+                });
+                branchDetails[shortName] = 'criada';
+              }
+            }
 
-            await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?api-version=7.1`, {
-              method: 'POST',
-              body: JSON.stringify(refUpdates),
-            });
+            if (refUpdates.length > 0) {
+              await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/git/repositories/${repoId}/refs?api-version=7.1`, {
+                method: 'POST',
+                body: JSON.stringify(refUpdates),
+              });
+            }
+
+            creationDetails.branches = branchDetails;
+            await updateStep('creating_branches');
 
             // Step 4: Set develop as default branch
             await updateStep('setting_default_branch');
@@ -266,57 +299,69 @@ serve(async (req) => {
 
           // Step 5: Create environments if they don't exist
           await updateStep('creating_environments');
-          const envResults: string[] = [];
+          const envDetails: Record<string, string> = {};
           try {
             const envNames = ['dev', 'stg', 'rc', 'prd'];
             const existingEnvs = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`);
-            const existingNames = (existingEnvs.value || []).map((e: any) => e.name.toLowerCase());
+            const existingEnvNames = (existingEnvs.value || []).map((e: any) => e.name.toLowerCase());
             
             for (const envName of envNames) {
-              if (!existingNames.includes(envName)) {
+              if (!existingEnvNames.includes(envName)) {
                 await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/environments?api-version=7.1`, {
                   method: 'POST',
                   body: JSON.stringify({ name: envName, description: `Ambiente ${envName.toUpperCase()} - criado pelo S.H.I.E.L.D Platform` }),
                 });
-                envResults.push(`${envName}=criado`);
-                console.log(`Environment '${envName}' created`);
+                envDetails[envName] = 'criado';
               } else {
-                envResults.push(`${envName}=existente`);
-                console.log(`Environment '${envName}' already exists`);
+                envDetails[envName] = 'existente';
               }
             }
           } catch (envError) {
             console.error('Environment creation warning:', envError);
           }
-          // Store env results detail
-          await supabaseAdmin.from('components').update({
-            creation_step: `creating_environments:${envResults.join(',')}`,
-          }).eq('id', componentId);
+          creationDetails.environments = envDetails;
+          await updateStep('creating_environments');
 
           // Step 6: Create pipeline definition
           await updateStep('creating_pipeline');
+          let pipelineCreated = false;
+          let pipelineId: number | null = null;
           try {
-            const pipelineData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`, {
-              method: 'POST',
-              body: JSON.stringify({
-                name: repoName,
-                folder: '\\',
-                configuration: {
-                  type: 'yaml',
-                  path: '/azure-pipelines.yml',
-                  repository: {
-                    id: repoId,
-                    type: 'azureReposGit',
+            // Check if pipeline already exists
+            const existingPipelines = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`);
+            const existingPipeline = (existingPipelines.value || []).find((p: any) => p.name.toLowerCase() === repoName.toLowerCase());
+            
+            if (existingPipeline) {
+              pipelineId = existingPipeline.id;
+              pipelineCreated = false;
+              console.log('Pipeline already exists:', pipelineId);
+            } else {
+              const pipelineData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines?api-version=7.1`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  name: repoName,
+                  folder: '\\',
+                  configuration: {
+                    type: 'yaml',
+                    path: '/azure-pipelines.yml',
+                    repository: {
+                      id: repoId,
+                      type: 'azureReposGit',
+                    },
                   },
-                },
-              }),
-            });
-
-            console.log('Pipeline created:', pipelineData.id);
+                }),
+              });
+              pipelineId = pipelineData.id;
+              pipelineCreated = true;
+              console.log('Pipeline created:', pipelineId);
+            }
+            
+            creationDetails.pipeline = { status: pipelineCreated ? 'criado' : 'existente', id: pipelineId };
+            await updateStep('creating_pipeline');
 
             // Step 7: Run pipeline on develop
             await updateStep('running_pipeline');
-            await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineData.id}/runs?api-version=7.1`, {
+            const runData = await azureFetch(`${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/${pipelineId}/runs?api-version=7.1`, {
               method: 'POST',
               body: JSON.stringify({
                 resources: {
@@ -329,8 +374,14 @@ serve(async (req) => {
               }),
             });
 
+            creationDetails.pipelineRun = {
+              id: runData.id,
+              state: runData.state,
+              url: runData._links?.web?.href || null,
+            };
             console.log('Pipeline run triggered on develop');
           } catch (pipelineError) {
+            creationDetails.pipeline = { ...(creationDetails.pipeline || {}), error: (pipelineError as Error).message };
             console.error('Pipeline creation/run warning:', pipelineError);
           }
           
@@ -343,6 +394,7 @@ serve(async (req) => {
           approval_status: 'created',
           repo_url: repoUrl,
           creation_step: 'done',
+          creation_details: creationDetails,
         }).eq('id', componentId);
 
         return new Response(JSON.stringify({ 
