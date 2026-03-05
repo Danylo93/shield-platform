@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 import { Layers, GitFork, Users, Activity, Plus, ArrowRight, Shield } from "lucide-react";
 import { TemplateCard } from "@/components/idp/TemplateCard";
 import { CreateComponentDialog } from "@/components/idp/CreateComponentDialog";
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [selectedTemplate, setSelectedTemplate] = useState<AzureTemplate | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useNavigate();
+  const { isDevOps } = useAuth();
 
   const { data: repos } = useAzureRepos();
   const { data: projects } = useAzureProjects();
@@ -69,11 +71,15 @@ export default function Dashboard() {
       </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isDevOps ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
         <StatsCard title="Repositórios" value={repos?.length ?? "..."} subtitle="Azure DevOps" icon={Layers} color="primary" index={0} />
         <StatsCard title="Templates" value={templates?.length ?? "..."} subtitle="Disponíveis" icon={GitFork} color="accent" index={1} />
-        <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
-        <StatsCard title="Deploys" value={"—"} subtitle="em breve" icon={Activity} color="warning" index={3} />
+        {isDevOps && (
+          <>
+            <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
+            <StatsCard title="Deploys" value={"—"} subtitle="em breve" icon={Activity} color="warning" index={3} />
+          </>
+        )}
       </div>
 
       {/* Templates */}
