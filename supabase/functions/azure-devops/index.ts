@@ -554,7 +554,35 @@ serve(async (req) => {
       });
     }
 
-    // Run a pipeline on a specific branch
+    // Deploy stats - count pipeline runs across all projects in the last 30 days
+    if (action === 'deploy-stats') {
+      const minDate = new Date();
+      minDate.setDate(minDate.getDate() - 30);
+      const minTime = minDate.toISOString();
+
+      // Get all projects
+      const projectsData = await azureFetch(`${baseUrl}/_apis/projects?api-version=7.1&$top=100`);
+      const projects = projectsData.value || [];
+
+      let totalRuns = 0;
+      for (const project of projects) {
+        try {
+          // Use the builds API which supports minTime filter
+          const buildsData = await azureFetch(
+            `${baseUrl}/${encodeURIComponent(project.name)}/_apis/build/builds?api-version=7.1&minTime=${encodeURIComponent(minTime)}&$top=1000&queryOrder=startTimeDescending`
+          );
+          totalRuns += (buildsData.value || []).length;
+        } catch {
+          // Skip projects with no pipelines
+        }
+      }
+
+      return new Response(JSON.stringify({ total: totalRuns }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+
     if (action === 'run-pipeline') {
       if (req.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'POST required' }), {
