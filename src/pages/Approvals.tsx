@@ -313,11 +313,11 @@ export default function Approvals() {
                 </div>
 
                 {isCreating && (
-                  <CreationStepper currentStep={comp.creation_step} isComplete={false} />
+                  <CreationStepper currentStep={comp.creation_step} isComplete={false} details={comp.creation_details} />
                 )}
 
                 {comp.approval_status === "created" && (
-                  <CreationStepper currentStep="done" isComplete={true} />
+                  <CreationStepper currentStep="done" isComplete={true} details={comp.creation_details} />
                 )}
 
                 {comp.repo_url && comp.approval_status === "created" && (

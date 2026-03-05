@@ -21,6 +21,7 @@ export type Database = {
           approved_by: string | null
           created_at: string
           created_by: string
+          creation_details: Json | null
           creation_step: string | null
           description: string | null
           id: string
@@ -41,6 +42,7 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           created_by: string
+          creation_details?: Json | null
           creation_step?: string | null
           description?: string | null
           id?: string
@@ -61,6 +63,7 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           created_by?: string
+          creation_details?: Json | null
           creation_step?: string | null
           description?: string | null
           id?: string

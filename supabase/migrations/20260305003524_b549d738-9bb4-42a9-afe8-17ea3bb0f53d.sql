@@ -1,0 +1,1 @@
+ALTER TABLE public.components ADD COLUMN IF NOT EXISTS creation_details jsonb DEFAULT '{}'::jsonb;
