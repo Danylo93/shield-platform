@@ -632,6 +632,62 @@ serve(async (req) => {
       });
     }
 
+    // List pending pipeline approvals across all projects
+    if (action === 'pending-approvals') {
+      const projectsData = await azureFetch(`${baseUrl}/_apis/projects?api-version=7.1&$top=100`);
+      const projects = projectsData.value || [];
+      const allApprovals: any[] = [];
+
+      for (const project of projects) {
+        try {
+          const approvalsData = await azureFetch(
+            `${baseUrl}/${encodeURIComponent(project.name)}/_apis/pipelines/approvals?api-version=7.1-preview`
+          );
+          const approvals = approvalsData.value || [];
+          for (const a of approvals) {
+            allApprovals.push({ ...a, projectName: project.name });
+          }
+        } catch {
+          // Project may not have approvals configured
+        }
+      }
+
+      return new Response(JSON.stringify({ value: allApprovals, count: allApprovals.length }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Approve or reject a pipeline approval
+    if (action === 'update-approval') {
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'POST required' }), {
+          status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const body = await req.json();
+      const { projectName, approvalId, status, comment } = body;
+      if (!projectName || !approvalId || !status) {
+        return new Response(JSON.stringify({ error: 'Missing projectName, approvalId or status' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const data = await azureFetch(
+        `${baseUrl}/${encodeURIComponent(projectName)}/_apis/pipelines/approvals/${approvalId}?api-version=7.1-preview`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({
+            status: status, // 'approved' or 'rejected'
+            comment: comment || '',
+          }),
+        }
+      );
+
+      return new Response(JSON.stringify(data), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
