@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
@@ -63,7 +64,21 @@ export default function PipelineApprovals() {
   const [rejectDialog, setRejectDialog] = useState<any | null>(null);
   const [rejectComment, setRejectComment] = useState("");
 
-  const { data: approvals, isLoading } = useQuery({
+  // Fetch components created in the platform to filter approvals
+  const { data: platformComponents } = useQuery({
+    queryKey: ["platform-components-for-approvals"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("components")
+        .select("name, repo_name, project_name")
+        .eq("approval_status", "created");
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 60000,
+  });
+
+  const { data: rawApprovals, isLoading } = useQuery({
     queryKey: ["pipeline-approvals"],
     queryFn: async () => {
       const data = await fetchAzure("pending-approvals");
@@ -72,6 +87,18 @@ export default function PipelineApprovals() {
     refetchInterval: 30000,
     staleTime: 15000,
   });
+
+  // Filter approvals to only show ones matching platform components
+  const approvals = useMemo(() => {
+    if (!rawApprovals || !platformComponents) return [];
+    const componentNames = new Set(
+      platformComponents.map((c) => (c.repo_name || c.name).toLowerCase())
+    );
+    return rawApprovals.filter((a: any) => {
+      const pipelineName = (a.pipeline?.name || "").toLowerCase();
+      return componentNames.has(pipelineName);
+    });
+  }, [rawApprovals, platformComponents]);
 
   const approveMutation = useMutation({
     mutationFn: (approval: any) =>
