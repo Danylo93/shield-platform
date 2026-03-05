@@ -45,7 +45,7 @@ export default function Dashboard() {
             Central de <span className="text-gradient-shield">Comando</span>
           </h1>
           <p className="text-muted-foreground max-w-xl leading-relaxed">
-            Crie componentes a partir de protocolos aprovados, gerencie seus serviços e acelere
+            Crie componentes a partir de templates aprovados, gerencie seus serviços e acelere
             o desenvolvimento com a plataforma S.H.I.E.L.D.
           </p>
           <div className="flex gap-3 mt-8">
@@ -71,7 +71,7 @@ export default function Dashboard() {
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard title="Repositórios" value={repos?.length ?? "..."} subtitle="Azure DevOps" icon={Layers} color="primary" index={0} />
-        <StatsCard title="Protocolos" value={templates?.length ?? "..."} subtitle="Templates" icon={GitFork} color="accent" index={1} />
+        <StatsCard title="Templates" value={templates?.length ?? "..."} subtitle="Disponíveis" icon={GitFork} color="accent" index={1} />
         <StatsCard title="Projetos" value={projects?.length ?? "..."} subtitle="Azure DevOps" icon={Users} color="success" index={2} />
         <StatsCard title="Deploys" value={156} subtitle="últimos 30 dias" icon={Activity} color="warning" index={3} />
       </div>
@@ -80,8 +80,8 @@ export default function Dashboard() {
       <div>
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h2 className="text-lg font-semibold text-foreground font-display tracking-wide">Protocolos em Destaque</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">Inicie operações com protocolos aprovados para produção</p>
+            <h2 className="text-lg font-semibold text-foreground font-display tracking-wide">Templates em Destaque</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Comece rapidamente com templates prontos para produção</p>
           </div>
           <Button variant="ghost" size="sm" className="gap-1 text-primary hover:text-primary" onClick={() => navigate("/templates")}>
             Ver todos
@@ -91,7 +91,7 @@ export default function Dashboard() {
         {loadingTemplates ? (
           <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
-            <span className="text-sm">Carregando protocolos...</span>
+            <span className="text-sm">Carregando templates...</span>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

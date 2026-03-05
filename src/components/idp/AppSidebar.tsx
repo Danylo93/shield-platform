@@ -52,14 +52,14 @@ export function AppSidebar() {
   const devItems = [
     { title: "Central de Comando", url: "/", icon: LayoutDashboard },
     { title: "Meus Componentes", url: "/catalog", icon: Layers },
-    { title: "Protocolos", url: "/templates", icon: GitFork },
+    { title: "Templates", url: "/templates", icon: GitFork },
     { title: "Pipelines", url: "/pipelines", icon: Play },
   ];
 
   const devopsItems = [
     { title: "Central de Comando", url: "/", icon: LayoutDashboard },
     { title: "Catálogo", url: "/catalog", icon: Layers },
-    { title: "Protocolos", url: "/templates", icon: GitFork },
+    { title: "Templates", url: "/templates", icon: GitFork },
     { title: "Pipelines", url: "/pipelines", icon: Play },
     { title: "Aprovações", url: "/approvals", icon: ShieldCheck },
   ];
