@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2, XCircle, Clock, Loader2, GitFork, ExternalLink, AlertTriangle, ShieldCheck, User, FileText } from "lucide-react";
 import CreationStepper from "@/components/idp/CreationStepper";
+import PipelineApprovals from "@/components/idp/PipelineApprovals";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -199,6 +200,15 @@ export default function Approvals() {
 
       <div className="divider-glow" />
 
+      {/* Pipeline Approvals - only for DevOps */}
+      {isDevOps && (
+        <div className="space-y-3">
+          <PipelineApprovals />
+          <div className="divider-glow mt-6" />
+        </div>
+      )}
+
+      {/* Component Approvals */}
       {(!components || components.length === 0) ? (
         <div className="text-center py-20 text-muted-foreground">
           <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
