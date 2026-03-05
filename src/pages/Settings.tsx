@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,16 +20,16 @@ import {
   CheckCircle2,
   KeyRound,
   GitBranch,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 export default function Settings() {
-  const { profile, roles, user } = useAuth();
+  const { profile, roles, user, refreshProfile } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [fullName, setFullName] = useState(profile?.full_name || "");
   const [saving, setSaving] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
-  const [emailNotif, setEmailNotif] = useState(false);
 
   const initials = fullName
     ? fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
@@ -43,11 +44,25 @@ export default function Settings() {
         .update({ full_name: fullName, updated_at: new Date().toISOString() })
         .eq("id", user.id);
       if (error) throw error;
+      await refreshProfile();
       toast({ title: "Perfil atualizado!", description: "Suas informações foram salvas." });
     } catch (err: any) {
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!profile?.email) return;
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(profile.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir sua senha." });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
     }
   };
 
@@ -123,12 +138,7 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">Recomendamos alterar periodicamente</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={() => {
-              supabase.auth.resetPasswordForEmail(profile?.email || "", {
-                redirectTo: `${window.location.origin}/reset-password`,
-              });
-              toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada." });
-            }}>
+            <Button variant="outline" size="sm" onClick={handleResetPassword}>
               Enviar link de redefinição
             </Button>
           </div>
@@ -149,36 +159,6 @@ export default function Settings() {
       ),
     },
     {
-      id: "notifications",
-      title: "Notificações",
-      description: "Controle como você recebe alertas",
-      icon: Bell,
-      content: (
-        <div className="space-y-4 max-w-md">
-          <div className="flex items-center justify-between glass rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <Bell className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Notificações no app</p>
-                <p className="text-xs text-muted-foreground">Receba alertas sobre aprovações</p>
-              </div>
-            </div>
-            <Switch checked={notifications} onCheckedChange={setNotifications} />
-          </div>
-          <div className="flex items-center justify-between glass rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
-              <div>
-                <p className="text-sm font-medium text-foreground">Notificações por email</p>
-                <p className="text-xs text-muted-foreground">Receba um email quando seu componente for aprovado</p>
-              </div>
-            </div>
-            <Switch checked={emailNotif} onCheckedChange={setEmailNotif} />
-          </div>
-        </div>
-      ),
-    },
-    {
       id: "platform",
       title: "Plataforma",
       description: "Preferências gerais do DevPortal",
@@ -187,13 +167,19 @@ export default function Settings() {
         <div className="space-y-4 max-w-md">
           <div className="flex items-center justify-between glass rounded-xl p-4">
             <div className="flex items-center gap-3">
-              <Palette className="h-5 w-5 text-muted-foreground" />
+              {theme === "dark" ? (
+                <Moon className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <Sun className="h-5 w-5 text-muted-foreground" />
+              )}
               <div>
                 <p className="text-sm font-medium text-foreground">Modo escuro</p>
-                <p className="text-xs text-muted-foreground">Altere a aparência da interface</p>
+                <p className="text-xs text-muted-foreground">
+                  {theme === "dark" ? "Tema escuro ativado" : "Tema claro ativado"}
+                </p>
               </div>
             </div>
-            <Switch checked={darkMode} onCheckedChange={setDarkMode} />
+            <Switch checked={theme === "dark"} onCheckedChange={toggleTheme} />
           </div>
           <div className="glass rounded-xl p-4">
             <div className="flex items-center gap-3">
@@ -221,7 +207,6 @@ export default function Settings() {
       </motion.div>
 
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Sidebar nav */}
         <nav className="lg:w-56 shrink-0 space-y-1">
           {sections.map((s) => {
             const Icon = s.icon;
@@ -243,7 +228,6 @@ export default function Settings() {
           })}
         </nav>
 
-        {/* Content */}
         <div className="flex-1 min-w-0">
           {sections
             .filter((s) => s.id === activeSection)

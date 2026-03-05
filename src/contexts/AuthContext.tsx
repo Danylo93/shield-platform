@@ -18,6 +18,7 @@ interface AuthContextType {
   roles: AppRole[];
   isDevOps: boolean;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
   signUp: (email: string, password: string, fullName: string, squad: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -94,6 +95,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   };
 
+  const refreshProfile = async () => {
+    if (user) await fetchUserData(user.id);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -103,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         roles,
         isDevOps: roles.includes("devops"),
         loading,
+        refreshProfile,
         signUp,
         signIn,
         signOut,
