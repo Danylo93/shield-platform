@@ -28,7 +28,6 @@ export type Database = {
           language: string
           name: string
           project_name: string
-          runtime_version: string | null
           rejection_reason: string | null
           repo_name: string | null
           repo_url: string | null
@@ -50,7 +49,6 @@ export type Database = {
           language: string
           name: string
           project_name: string
-          runtime_version?: string | null
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
@@ -72,7 +70,6 @@ export type Database = {
           language?: string
           name?: string
           project_name?: string
-          runtime_version?: string | null
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
