@@ -1,0 +1,17 @@
+version = 1
+
+exclude_patterns = [
+  "dist/**",
+  "node_modules/**",
+  "coverage/**",
+]
+
+test_patterns = [
+  "src/test/**",
+  "**/*.test.ts",
+  "**/*.test.tsx",
+]
+
+[[analyzers]]
+name = "javascript"
+enabled = true

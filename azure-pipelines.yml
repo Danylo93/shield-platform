@@ -6,137 +6,154 @@ trigger:
       - release/*
       - feature/*
 
-pool:
-  name: 'wakanda-agent-pool'
-
 variables:
-  - name: nodeVersion
-    value: '20'
-  - name: buildConfiguration
-    value: 'production'
+  - group: shield-platform-poc
+  - name: dockerRegistryServiceConnection
+    value: 'acr-wakanda-hub'
+  - name: tier
+    value: 'frontend'
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/main') }}:
+      - name: environment
+        value: 'prd'
+  - ${{ if eq(variables['Build.SourceBranch'], 'refs/heads/develop') }}:
+      - name: environment
+        value: 'dev'
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/release/') }}:
+      - name: environment
+        value: 'rc'
+  - ${{ if startsWith(variables['Build.SourceBranch'], 'refs/heads/feature/') }}:
+      - name: environment
+        value: 'dev'
 
 stages:
   - stage: CI
-    displayName: 'CI - Build & Test'
+    displayName: 'CI to ${{ variables.environment }}'
     jobs:
-      - job: BuildAndTest
+      - job: CI
         displayName: 'Build and Test Application'
+        pool:
+          vmImage: 'ubuntu-latest'
         steps:
-          - checkout: self
-            displayName: 'Checkout shield-platform'
+          - bash: |
+              COMMIT_SHA=$(echo $(Build.SourceVersion) | cut -c1-10)
+              ENVIRONMENT=${{ variables.environment }}
+              IMAGE_TAG="${ENVIRONMENT}-${COMMIT_SHA}"
+              TIER="$(tier)"
+              REPO_NAME=$(Build.Repository.Name)
 
-          - task: UseNode@1
-            displayName: 'Setup Node.js $(nodeVersion)'
+              echo "##vso[task.setvariable variable=imageTag]$IMAGE_TAG"
+              echo "##vso[task.setvariable variable=repoName]$REPO_NAME"
+
+              echo -e "\n\033[1;36m===== BUILD INFORMATION =====\033[0m"
+              echo -e "\033[1;33mTier:\033[0m \033[1;37m$TIER\033[0m"
+              echo -e "\033[1;33mRepository:\033[0m \033[1;37m$REPO_NAME\033[0m"
+              echo -e "\033[1;33mCommit SHA:\033[0m \033[1;37m$COMMIT_SHA\033[0m"
+              echo -e "\033[1;33mEnvironment:\033[0m \033[1;37m$ENVIRONMENT\033[0m"
+              echo -e "\033[1;33mImage Tag:\033[0m \033[1;37m$IMAGE_TAG\033[0m"
+              echo -e "\033[1;36m=============================\033[0m\n"
+            displayName: 'Prepare Image Tag'
+
+          - bash: |
+              set -e
+              [ -n "${VITE_SUPABASE_PROJECT_ID:-}" ] || (echo "VITE_SUPABASE_PROJECT_ID vazio" && exit 1)
+              [ -n "${VITE_SUPABASE_PUBLISHABLE_KEY:-}" ] || (echo "VITE_SUPABASE_PUBLISHABLE_KEY vazio" && exit 1)
+              [ -n "${VITE_SUPABASE_URL:-}" ] || (echo "VITE_SUPABASE_URL vazio" && exit 1)
+              echo "Supabase build vars carregadas com sucesso."
+            displayName: 'Validate Supabase Build Vars'
+            env:
+              VITE_SUPABASE_PROJECT_ID: $(VITE_SUPABASE_PROJECT_ID)
+              VITE_SUPABASE_PUBLISHABLE_KEY: $(VITE_SUPABASE_PUBLISHABLE_KEY)
+              VITE_SUPABASE_URL: $(VITE_SUPABASE_URL)
+
+          - task: Docker@2
+            displayName: 'Build Image'
             inputs:
-              version: '$(nodeVersion).x'
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              repository: '$(repoName)'
+              command: 'build'
+              Dockerfile: 'Dockerfile'
+              tags: '$(imageTag)'
+              arguments: >
+                --pull
+                --no-cache
+                --build-arg VITE_SUPABASE_PROJECT_ID=$(VITE_SUPABASE_PROJECT_ID)
+                --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$(VITE_SUPABASE_PUBLISHABLE_KEY)
+                --build-arg VITE_SUPABASE_URL=$(VITE_SUPABASE_URL)
 
-          - script: |
-              npm ci
-            displayName: 'Install Dependencies'
-
-          - script: |
-              npm run lint
-            displayName: 'Lint'
-            continueOnError: true
-
-          - script: |
-              npm run test
-            displayName: 'Run Unit Tests'
-            continueOnError: true
-
-          - script: |
-              npm run build
-            displayName: 'Build Application'
-
-          - task: PublishPipelineArtifact@1
-            displayName: 'Publish Build Artifact'
+          - task: Docker@2
+            displayName: 'Push Image'
             inputs:
-              targetPath: '$(System.DefaultWorkingDirectory)/dist'
-              artifact: 'shield-platform-dist'
-              publishLocation: 'pipeline'
+              containerRegistry: '$(dockerRegistryServiceConnection)'
+              repository: '$(repoName)'
+              command: 'push'
+              tags: '$(imageTag)'
 
-  - stage: DeployDev
-    displayName: 'Deploy to Dev'
+  - stage: CD
+    displayName: 'ArgoCD to ${{ variables.environment }}'
     dependsOn: CI
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/develop'))
     jobs:
-      - deployment: DeployDev
-        displayName: 'Deploy to Dev Environment'
-        environment: 'dev'
+      - deployment: ArgoCD
+        displayName: 'ArgoCD'
+        environment: ${{ variables.environment }}
+        condition: succeeded()
+        pool:
+          name: 'wakanda-agent-pool'
         strategy:
           runOnce:
             deploy:
               steps:
-                - download: current
-                  artifact: 'shield-platform-dist'
-                  displayName: 'Download Build Artifact'
+                - checkout: git://Devops/argo-gitops
+                  persistCredentials: true
+                  clean: true
+                - task: Bash@3
+                  displayName: 'Tag Image'
+                  inputs:
+                    targetType: 'inline'
+                    script: |
+                      set -e
 
-                - script: |
-                    echo "🛡️ Deploying S.H.I.E.L.D Platform to DEV..."
-                    echo "Artifact path: $(Pipeline.Workspace)/shield-platform-dist"
-                    # Adicione aqui o comando de deploy para o ambiente dev
-                    # Ex: az storage blob upload-batch, scp, rsync, docker push, etc.
-                  displayName: 'Deploy to Dev'
+                      COMMIT_SHA=$(echo $(Build.SourceVersion) | cut -c1-10)
+                      ENVIRONMENT=${{ variables.environment }}
+                      TIER="$(tier)"
+                      IMAGE_TAG="${ENVIRONMENT}-${COMMIT_SHA}"
+                      REPO_NAME=$(Build.Repository.Name)
 
-  - stage: DeployStg
-    displayName: 'Deploy to Staging'
-    dependsOn: DeployDev
-    condition: succeeded()
-    jobs:
-      - deployment: DeployStg
-        displayName: 'Deploy to Staging Environment'
-        environment: 'stg'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: 'shield-platform-dist'
-                  displayName: 'Download Build Artifact'
+                      VALUES_FILE="gitops/apps/${TIER}/$(Build.Repository.Name)/${ENVIRONMENT}/values.yaml"
 
-                - script: |
-                    echo "🛡️ Deploying S.H.I.E.L.D Platform to STG..."
-                    # Adicione aqui o comando de deploy para staging
-                  displayName: 'Deploy to Staging'
+                      if [ ! -f "$VALUES_FILE" ]; then
+                        echo "ERROR: File not found: $VALUES_FILE"
+                        exit 1
+                      fi
 
-  - stage: DeployRC
-    displayName: 'Deploy to RC'
-    dependsOn: DeployStg
-    condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/heads/release/'))
-    jobs:
-      - deployment: DeployRC
-        displayName: 'Deploy to RC Environment'
-        environment: 'rc'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: 'shield-platform-dist'
-                  displayName: 'Download Build Artifact'
+                      echo "Updating tag in file: $VALUES_FILE"
+                      sed -i "s|tag:.*|tag: ${IMAGE_TAG}|g" "$VALUES_FILE"
 
-                - script: |
-                    echo "🛡️ Deploying S.H.I.E.L.D Platform to RC..."
-                    # Adicione aqui o comando de deploy para RC
-                  displayName: 'Deploy to RC'
+                      git config user.email "devopsacesso@useargo.com"
+                      git config user.name "ArgoIT Devops"
 
-  - stage: DeployPrd
-    displayName: 'Deploy to Production'
-    dependsOn: DeployRC
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-    jobs:
-      - deployment: DeployPrd
-        displayName: 'Deploy to Production Environment'
-        environment: 'prd'
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - download: current
-                  artifact: 'shield-platform-dist'
-                  displayName: 'Download Build Artifact'
+                      git add .
+                      git commit -m "Update image ${REPO_NAME} to ${IMAGE_TAG}" || echo "No changes to commit"
 
-                - script: |
-                    echo "🛡️ Deploying S.H.I.E.L.D Platform to PRODUCTION..."
-                    # Adicione aqui o comando de deploy para produção
-                  displayName: 'Deploy to Production'
+                      echo "Syncing with remote (pull with rebase)..."
+                      set +e
+                      git pull origin main --rebase
+                      PULL_EXIT_CODE=$?
+                      set -e
+
+                      if [ $PULL_EXIT_CODE -ne 0 ]; then
+                        echo "Rebase failed, attempting merge instead..."
+                        set +e
+                        git pull origin main --no-rebase
+                        PULL_EXIT_CODE=$?
+                        set -e
+
+                        if [ $PULL_EXIT_CODE -ne 0 ]; then
+                          echo "Error: Unable to sync with remote."
+                          exit 1
+                        fi
+                      fi
+
+                      echo "Successfully synced with remote"
+
+                      echo "Pushing changes to remote..."
+                      git push origin HEAD:main
