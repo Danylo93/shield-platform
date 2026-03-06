@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAzureProjects, AzureProject, AzureTemplate } from "@/hooks/useAzureDevOps";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Rocket, Box, CheckCircle2, FolderOpen, Search, Loader2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -24,6 +25,14 @@ const langLabels: Record<string, string> = {
   python: "Python",
   dotnet: ".NET",
 };
+
+const runtimeVersionsByLanguage: Record<string, string[]> = {
+  java: ["8", "11", "17", "21", "25"],
+  dotnet: ["6", "8", "9", "10"],
+  python: ["3.11", "3.12", "3.13", "3.14"],
+};
+
+const getDefaultRuntimeVersion = (language?: string) => runtimeVersionsByLanguage[language || "java"]?.[0] ?? "17";
 
 interface CreateComponentDialogProps {
   open: boolean;
@@ -40,10 +49,15 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
   const [componentName, setComponentName] = useState("");
   const [description, setDescription] = useState("");
   const [rifc, setRifc] = useState("");
+  const [runtimeVersion, setRuntimeVersion] = useState(() => getDefaultRuntimeVersion(template?.language));
   const [creating, setCreating] = useState(false);
   const { user, profile } = useAuth();
 
   const { data: projects, isLoading: loadingProjects } = useAzureProjects();
+
+  useEffect(() => {
+    setRuntimeVersion(getDefaultRuntimeVersion(template?.language));
+  }, [template?.id, template?.language]);
 
   if (!template) return null;
 
@@ -59,6 +73,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
         project_name: selectedProject.name,
         repo_name: componentName,
         rifc: rifc.trim(),
+        runtime_version: runtimeVersion,
         created_by: user.id,
         squad: profile?.squad || "",
         approval_status: "pending",
@@ -84,6 +99,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
     setComponentName("");
     setDescription("");
     setRifc("");
+    setRuntimeVersion(getDefaultRuntimeVersion(template?.language));
   };
 
   const filteredProjects = (projects || []).filter((p) =>
@@ -199,6 +215,21 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 <Textarea id="desc" placeholder="Descreva o propósito deste componente..." value={description}
                   onChange={(e) => setDescription(e.target.value)} className="mt-1.5 resize-none" rows={3} />
               </div>
+              <div>
+                <Label>Versão do Runtime</Label>
+                <Select value={runtimeVersion} onValueChange={setRuntimeVersion}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue placeholder="Selecione a versão" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(runtimeVersionsByLanguage[template.language] || []).map((version) => (
+                      <SelectItem key={version} value={version}>
+                        {template.language === "dotnet" ? `.NET ${version}` : `${langLabels[template.language] || template.language} ${version}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex justify-between">
                 <Button variant="ghost" onClick={() => setStep("project")}>Voltar</Button>
                 <Button onClick={() => setStep("review")} disabled={!canProceedInfo}>Próximo</Button>
@@ -212,6 +243,7 @@ export function CreateComponentDialog({ open, onOpenChange, template }: CreateCo
                 <div className="flex justify-between"><span className="text-muted-foreground">Projeto</span><span className="font-medium">{selectedProject?.name}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Componente / Repo</span><span className="font-mono text-xs">{componentName}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Template</span><span>{template.name} ({langLabels[template.language] || template.language})</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Versão Runtime</span><span>{template.language === "dotnet" ? `.NET ${runtimeVersion}` : `${langLabels[template.language] || template.language} ${runtimeVersion}`}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">RIFC</span><span className="font-mono text-xs">{rifc}</span></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">Owner</span><span>argosolutions</span></div>
                 {description && (

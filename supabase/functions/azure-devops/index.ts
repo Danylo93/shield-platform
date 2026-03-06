@@ -77,7 +77,7 @@ serve(async (req) => {
       }
 
       const body = await req.json();
-      const { componentId, projectName, repoName, language } = body;
+      const { componentId, projectName, repoName, language, runtimeVersion } = body;
 
       if (!componentId || !projectName || !repoName) {
         return new Response(JSON.stringify({ error: 'Missing componentId, projectName or repoName' }), {
@@ -141,31 +141,65 @@ serve(async (req) => {
 
         const readmeContent = `# ${repoName}\n\nRepositório criado automaticamente pelo IDP ArgoIT.\n\n## Branches\n- \`main\` - Branch principal\n- \`develop\` - Branch de desenvolvimento (padrão)\n- \`feature/teste\` - Branch de feature\n- \`release/v1.0\` - Branch de release`;
 
-        const lang = (language || 'java').toLowerCase();
-        const templateId = body.templateId || '';
+        const lang = (language || "java").toLowerCase();
+        const templateId = body.templateId || "";
+        const requestedRuntimeVersion = String(runtimeVersion || "").trim();
 
-        // .NET version mapping
-        const dotnetVersionMap: Record<string, { runtime: string; sdk: string; tfm: string }> = {
-          '6':  { runtime: '6.0', sdk: '6.0.428',                    tfm: 'net6.0' },
-          '8':  { runtime: '8.0', sdk: '8.0.407',                    tfm: 'net8.0' },
-          '9':  { runtime: '9.0', sdk: '9.0.203',                    tfm: 'net9.0' },
-          '10': { runtime: '10.0-preview', sdk: '10.0.100-rc.2.25502.107', tfm: 'net10.0' },
+        const sanitizeMajor = (value: string) => value.replace(/[^\d]/g, "");
+
+        const dotnetVersionMap: Record<string, { sdk: string; tfm: string; baseTag: string }> = {
+          "6": { sdk: "6.0.428", tfm: "net6.0", baseTag: "base-dotnet6" },
+          "8": { sdk: "8.0.407", tfm: "net8.0", baseTag: "base-dotnet8" },
+          "9": { sdk: "9.0.203", tfm: "net9.0", baseTag: "base-dotnet9" },
+          "10": { sdk: "10.0.100", tfm: "net10.0", baseTag: "base-dotnet10" },
         };
+        const supportedJavaVersions = new Set(["8", "11", "17", "21", "25"]);
+        const supportedPythonVersions = new Set(["3.11", "3.12", "3.13", "3.14"]);
 
-        // Extract dotnet version from templateId (e.g. "dotnet8-web-api" -> "8")
-        let dotnetVer = '8';
-        const dotnetMatch = templateId.match(/dotnet(\d+)/);
-        if (dotnetMatch) dotnetVer = dotnetMatch[1];
-        const dv = dotnetVersionMap[dotnetVer] || dotnetVersionMap['8'];
+        let dotnetVer = "8";
+        const dotnetMatch = templateId.match(/dotnet(\d+)/i);
+        if (requestedRuntimeVersion) {
+          const requestedMajor = sanitizeMajor(requestedRuntimeVersion);
+          if (dotnetVersionMap[requestedMajor]) dotnetVer = requestedMajor;
+        } else if (dotnetMatch && dotnetVersionMap[dotnetMatch[1]]) {
+          dotnetVer = dotnetMatch[1];
+        }
+        const dv = dotnetVersionMap[dotnetVer] || dotnetVersionMap["8"];
 
-        // Language-specific files
+        let javaVer = "17";
+        const javaMatch = templateId.match(/java(\d+)/i);
+        if (requestedRuntimeVersion && supportedJavaVersions.has(requestedRuntimeVersion)) {
+          javaVer = requestedRuntimeVersion;
+        } else if (javaMatch && supportedJavaVersions.has(javaMatch[1])) {
+          javaVer = javaMatch[1];
+        }
+
+        const springBootByJava: Record<string, string> = {
+          "8": "2.7.18",
+          "11": "2.7.18",
+          "17": "3.2.0",
+          "21": "3.2.0",
+          "25": "3.2.0",
+        };
+        const springBootVersion = springBootByJava[javaVer] || "3.2.0";
+
+        let pythonVer = "3.13";
+        const pythonMatch = templateId.match(/python(\d+(?:\.\d+)?)/i);
+        if (requestedRuntimeVersion && supportedPythonVersions.has(requestedRuntimeVersion)) {
+          pythonVer = requestedRuntimeVersion;
+        } else if (pythonMatch && supportedPythonVersions.has(pythonMatch[1])) {
+          pythonVer = pythonMatch[1];
+        }
+
+        creationDetails.runtime = { language: lang, version: lang === "dotnet" ? dotnetVer : lang === "java" ? javaVer : pythonVer };
+
         const langFiles: Record<string, { dockerfile: string; deepsource: string; pipeline: string; srcFiles: { path: string; content: string }[] }> = {
           java: {
-            dockerfile: `# Final runtime image\nFROM eclipse-temurin:17-jre-jammy AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\nARG JAVA_JAR\nENV JAVA_JAR=\${JAVA_JAR}\n\nENV JAVA_OPTS=""\nENV TZ=America/Sao_Paulo\n\nENV APP_PORT=8080\n\nEXPOSE 8080\n\nENTRYPOINT ["sh", "-c", "java \${JAVA_OPTS} -jar \${JAVA_JAR}"]`,
-            deepsource: `version = 1\n\n[[analyzers]]\nname = "java"\n\n  [analyzers.meta]\n  runtime_version = "17"`,
+            dockerfile: `# Multi-stage build para microserviços Java\nFROM maven:3.9-eclipse-temurin-${javaVer} AS build\nWORKDIR /src\n\n# Copiar arquivos de dependências primeiro para melhor uso de cache\nCOPY pom.xml .\nRUN mvn -B -q -DskipTests dependency:go-offline\n\n# Copiar código fonte e compilar\n# Gerar uber-jar para que o JAR tenha Main-Class no manifest e seja executável\nCOPY src ./src\nRUN mvn -B -DskipTests clean package -Dquarkus.package.type=uber-jar\n\n# Stage 2: Imagem de runtime usando a base customizada\nFROM acrwakandause2hubiszw.azurecr.io/base-java:latest\n\n# Copiar o JAR da etapa de build\nCOPY --from=build /src/target/*.jar /app/app.jar\n\n# Configurar a variável de ambiente para o JAR\nENV JAVA_JAR=app.jar`,
+            deepsource: `version = 1\n\n[[analyzers]]\nname = "java"\n\n  [analyzers.meta]\n  runtime_version = "${javaVer}"`,
             pipeline: "trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nvariables:\n  - template: base-argoit/variables/global.yml@argo-code\n\nstages:\n  - template: base-argoit/java/template.yml@argo-code\n    parameters:\n      environment: ${{ variables.environment }}",
             srcFiles: [
-              { path: "/pom.xml", content: `<?xml version="1.0" encoding="UTF-8"?>\n<project xmlns="http://maven.apache.org/POM/4.0.0"\n         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">\n    <modelVersion>4.0.0</modelVersion>\n    <parent>\n        <groupId>org.springframework.boot</groupId>\n        <artifactId>spring-boot-starter-parent</artifactId>\n        <version>3.2.0</version>\n        <relativePath/>\n    </parent>\n    <groupId>com.argoit</groupId>\n    <artifactId>${repoName}</artifactId>\n    <version>0.0.1-SNAPSHOT</version>\n    <name>${repoName}</name>\n    <description>Projeto criado pelo IDP ArgoIT</description>\n    <properties>\n        <java.version>17</java.version>\n    </properties>\n    <dependencies>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-web</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-actuator</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-test</artifactId>\n            <scope>test</scope>\n        </dependency>\n    </dependencies>\n    <build>\n        <plugins>\n            <plugin>\n                <groupId>org.springframework.boot</groupId>\n                <artifactId>spring-boot-maven-plugin</artifactId>\n            </plugin>\n        </plugins>\n    </build>\n</project>` },
+              { path: "/pom.xml", content: `<?xml version="1.0" encoding="UTF-8"?>\n<project xmlns="http://maven.apache.org/POM/4.0.0"\n         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"\n         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">\n    <modelVersion>4.0.0</modelVersion>\n    <parent>\n        <groupId>org.springframework.boot</groupId>\n        <artifactId>spring-boot-starter-parent</artifactId>\n        <version>${springBootVersion}</version>\n        <relativePath/>\n    </parent>\n    <groupId>com.argoit</groupId>\n    <artifactId>${repoName}</artifactId>\n    <version>0.0.1-SNAPSHOT</version>\n    <name>${repoName}</name>\n    <description>Projeto criado pelo IDP ArgoIT</description>\n    <properties>\n        <java.version>${javaVer}</java.version>\n    </properties>\n    <dependencies>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-web</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-actuator</artifactId>\n        </dependency>\n        <dependency>\n            <groupId>org.springframework.boot</groupId>\n            <artifactId>spring-boot-starter-test</artifactId>\n            <scope>test</scope>\n        </dependency>\n    </dependencies>\n    <build>\n        <plugins>\n            <plugin>\n                <groupId>org.springframework.boot</groupId>\n                <artifactId>spring-boot-maven-plugin</artifactId>\n            </plugin>\n        </plugins>\n    </build>\n</project>` },
               { path: "/src/main/java/com/argoit/Application.java", content: `package com.argoit;\n\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n\n@SpringBootApplication\npublic class Application {\n    public static void main(String[] args) {\n        SpringApplication.run(Application.class, args);\n    }\n}` },
               { path: "/src/main/java/com/argoit/controller/HealthController.java", content: `package com.argoit.controller;\n\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\nimport java.util.Map;\n\n@RestController\npublic class HealthController {\n\n    @GetMapping("/health")\n    public Map<String, String> health() {\n        return Map.of("status", "UP", "service", "${repoName}");\n    }\n}` },
               { path: "/src/main/resources/application.yml", content: `server:\n  port: 8080\n\nspring:\n  application:\n    name: ${repoName}\n\nmanagement:\n  endpoints:\n    web:\n      exposure:\n        include: health,info` },
@@ -174,11 +208,11 @@ serve(async (req) => {
             ],
           },
           python: {
-            dockerfile: `FROM python:3.11-slim\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV PYTHONUNBUFFERED=1\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY src/ ./src/\n\nEXPOSE 8080\n\nCMD ["python", "src/main.py"]`,
-            deepsource: `version = 1\n\n[[analyzers]]\nname = "python"\n\n  [analyzers.meta]\n  runtime_version = "3.x"`,
+            dockerfile: `FROM python:${pythonVer}-slim\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV PYTHONUNBUFFERED=1\n\nCOPY requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\n\nCOPY src/ ./src/\n\nEXPOSE 8080\n\nCMD ["python", "src/main.py"]`,
+            deepsource: `version = 1\n\n[[analyzers]]\nname = "python"\n\n  [analyzers.meta]\n  runtime_version = "${pythonVer}"`,
             pipeline: "trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: argo-code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nvariables:\n  - template: base-argoit/variables/global.yml@argo-code\n\nstages:\n  - template: base-argoit/python/template.yml@argo-code\n    parameters:\n      environment: ${{ variables.environment }}",
             srcFiles: [
-              { path: "/requirements.txt", content: `fastapi==0.104.1\nuvicorn==0.24.0\npydantic==2.5.0\npytest==7.4.3` },
+              { path: "/requirements.txt", content: `fastapi==0.115.12\nuvicorn==0.34.0\npydantic==2.11.0\npytest==8.3.5` },
               { path: "/src/__init__.py", content: `` },
               { path: "/src/main.py", content: `from fastapi import FastAPI\nimport uvicorn\n\napp = FastAPI(title="${repoName}", version="0.1.0")\n\n\n@app.get("/health")\ndef health():\n    return {"status": "UP", "service": "${repoName}"}\n\n\n@app.get("/")\ndef root():\n    return {"message": "Bem-vindo ao ${repoName}"}\n\n\nif __name__ == "__main__":\n    uvicorn.run(app, host="0.0.0.0", port=8080)` },
               { path: "/src/config.py", content: `import os\n\n\nclass Settings:\n    APP_NAME: str = "${repoName}"\n    APP_PORT: int = int(os.getenv("APP_PORT", "8080"))\n    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "dev")\n\n\nsettings = Settings()` },
@@ -188,7 +222,7 @@ serve(async (req) => {
             ],
           },
           dotnet: {
-            dockerfile: `FROM mcr.microsoft.com/dotnet/aspnet:${dv.runtime} AS runtime\nWORKDIR /app\nMAINTAINER Argo DevSecOps <devopsacesso@useargo.com>\n\nENV TZ=America/Sao_Paulo\nENV ASPNETCORE_URLS=http://+:8080\n\nEXPOSE 8080\n\nCOPY publish/ .\n\nENTRYPOINT ["dotnet", "${repoName}.dll"]`,
+            dockerfile: `FROM acrwakandause2hubiszw.azurecr.io/${dv.baseTag}:latest\n\nCOPY ./publish .\n\nENV DOTNET_DLL=${repoName}.dll`,
             deepsource: `version = 1\n\n[[analyzers]]\nname = "csharp"`,
             pipeline: `trigger:\n  branches:\n    include:\n       - main\n       - develop\n       - feature/*\n       - release/*\n\nresources:\n  repositories:\n    - repository: code\n      type: git\n      name: Devops/argo-code\n      ref: refs/heads/main\n\nstages:\n  - template: base-argoit/dotnet/template.yml@code\n    parameters:\n      dotNetVersion: '${dv.sdk}'`,
             srcFiles: [

@@ -93,6 +93,7 @@ export default function Approvals() {
           repoName: comp.repo_name || comp.name,
           language: comp.language,
           templateId: comp.template_id,
+          runtimeVersion: comp.runtime_version,
         }),
       });
 
@@ -146,6 +147,7 @@ export default function Approvals() {
           repoName: comp.repo_name || comp.name,
           language: comp.language,
           templateId: comp.template_id,
+          runtimeVersion: comp.runtime_version,
         }),
       });
 
@@ -248,6 +250,11 @@ export default function Approvals() {
                         {comp.project_name} • {new Date(comp.created_at).toLocaleDateString("pt-BR")}
                         {comp.squad && ` • ${comp.squad}`}
                       </span>
+                      {comp.runtime_version && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {comp.language === "dotnet" ? `.NET ${comp.runtime_version}` : `${comp.language} ${comp.runtime_version}`}
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       {comp.creator_name && (

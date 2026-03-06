@@ -194,6 +194,11 @@ export default function Catalog() {
                       {comp.squad && ` • ${comp.squad}`}
                       {comp.repo_name && ` • ${comp.repo_name}`}
                     </p>
+                    {comp.runtime_version && (
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {comp.language === "dotnet" ? `.NET ${comp.runtime_version}` : `${comp.language} ${comp.runtime_version}`}
+                      </p>
+                    )}
                   </div>
                   <Badge variant="outline" className={`gap-1 shrink-0 ${status.color}`}>
                     {isCreating ? <Loader2 className="h-3 w-3 animate-spin" /> : <StatusIcon className="h-3 w-3" />}
