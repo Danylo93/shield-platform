@@ -28,7 +28,6 @@ export type Database = {
           language: string
           name: string
           project_name: string
-          runtime_version: string | null
           rejection_reason: string | null
           repo_name: string | null
           repo_url: string | null
@@ -50,7 +49,6 @@ export type Database = {
           language: string
           name: string
           project_name: string
-          runtime_version?: string | null
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
@@ -72,7 +70,6 @@ export type Database = {
           language?: string
           name?: string
           project_name?: string
-          runtime_version?: string | null
           rejection_reason?: string | null
           repo_name?: string | null
           repo_url?: string | null
@@ -80,6 +77,39 @@ export type Database = {
           squad?: string
           template_id?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      playbook_runs: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          logs: string | null
+          playbook_name: string
+          started_by: string
+          status: string
+          target_hosts: string[]
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          logs?: string | null
+          playbook_name: string
+          started_by: string
+          status?: string
+          target_hosts?: string[]
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          logs?: string | null
+          playbook_name?: string
+          started_by?: string
+          status?: string
+          target_hosts?: string[]
         }
         Relationships: []
       }

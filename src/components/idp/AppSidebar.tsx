@@ -8,6 +8,7 @@ import {
   Shield,
   ShieldCheck,
   Play,
+  Terminal,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -62,6 +63,7 @@ export function AppSidebar() {
     { title: "Templates", url: "/templates", icon: GitFork },
     { title: "Pipelines", url: "/pipelines", icon: Play },
     { title: "Aprovações", url: "/approvals", icon: ShieldCheck },
+    { title: "Automações", url: "/automations", icon: Terminal },
   ];
 
   const mainItems = isDevOps ? devopsItems : devItems;

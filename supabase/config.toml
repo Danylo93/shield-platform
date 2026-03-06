@@ -2,3 +2,6 @@ project_id = "luamthemulxzfdbwuzuk"
 
 [functions.azure-devops]
 verify_jwt = false
+
+[functions.run-playbook]
+verify_jwt = false
