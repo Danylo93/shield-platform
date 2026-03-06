@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import Catalog from "./pages/Catalog";
 import Approvals from "./pages/Approvals";
 import Pipelines from "./pages/Pipelines";
+import Automations from "./pages/Automations";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 
@@ -40,6 +41,7 @@ const App = () => (
                 <Route path="/catalog" element={<Catalog />} />
                 <Route path="/approvals" element={<Approvals />} />
                 <Route path="/pipelines" element={<Pipelines />} />
+                <Route path="/automations" element={<Automations />} />
                 <Route path="/settings" element={<Settings />} />
               </Route>
               <Route path="*" element={<NotFound />} />
