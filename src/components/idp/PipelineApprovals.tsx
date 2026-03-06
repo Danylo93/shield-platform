@@ -78,7 +78,7 @@ export default function PipelineApprovals() {
     staleTime: 60000,
   });
 
-  const { data: rawApprovals, isLoading } = useQuery({
+  const { data: rawApprovals, isLoading, error } = useQuery({
     queryKey: ["pipeline-approvals"],
     queryFn: async () => {
       const data = await fetchAzure("pending-approvals");
@@ -141,6 +141,16 @@ export default function PipelineApprovals() {
       <div className="flex items-center justify-center py-10 gap-2 text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
         <span className="text-sm">Buscando aprovações de pipeline...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-10 text-destructive">
+        <ShieldAlert className="h-8 w-8 mx-auto mb-2 opacity-80" />
+        <p className="text-sm font-medium">Erro ao buscar aprovações de pipeline</p>
+        <p className="text-xs mt-1">{(error as Error).message}</p>
       </div>
     );
   }

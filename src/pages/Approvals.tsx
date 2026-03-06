@@ -39,6 +39,41 @@ export default function Approvals() {
   const [rejectDialog, setRejectDialog] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
+  const callCreateRepo = async (comp: any) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    const url = `${supabaseUrl}/functions/v1/azure-devops?action=create-repo`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${supabaseKey}`,
+          apikey: supabaseKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          componentId: comp.id,
+          projectName: comp.project_name,
+          repoName: comp.repo_name || comp.name,
+          language: comp.language,
+          templateId: comp.template_id,
+          runtimeVersion: comp.runtime_version,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(errData.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error) {
+      if (error instanceof TypeError) {
+        throw new Error(`Falha de rede ao chamar Edge Function (${url}). Verifique conectividade, CORS e URL do Supabase.`);
+      }
+      throw error;
+    }
+  };
+
   const { data: components, isLoading } = useQuery({
     queryKey: ["components-approvals"],
     queryFn: async () => {
@@ -77,31 +112,7 @@ export default function Approvals() {
         .eq("id", comp.id);
       if (error) throw error;
 
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/azure-devops?action=create-repo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-          'apikey': supabaseKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          componentId: comp.id,
-          projectName: comp.project_name,
-          repoName: comp.repo_name || comp.name,
-          language: comp.language,
-          templateId: comp.template_id,
-          runtimeVersion: comp.runtime_version,
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-      return res.json();
+      return callCreateRepo(comp);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["components-approvals"] });
@@ -131,31 +142,7 @@ export default function Approvals() {
 
   const retryMutation = useMutation({
     mutationFn: async (comp: any) => {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-      const res = await fetch(`${supabaseUrl}/functions/v1/azure-devops?action=create-repo`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${supabaseKey}`,
-          'apikey': supabaseKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          componentId: comp.id,
-          projectName: comp.project_name,
-          repoName: comp.repo_name || comp.name,
-          language: comp.language,
-          templateId: comp.template_id,
-          runtimeVersion: comp.runtime_version,
-        }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error(errData.error || `HTTP ${res.status}`);
-      }
-      return res.json();
+      return callCreateRepo(comp);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["components-approvals"] });
