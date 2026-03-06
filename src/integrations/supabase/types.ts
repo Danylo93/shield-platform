@@ -80,6 +80,39 @@ export type Database = {
         }
         Relationships: []
       }
+      playbook_runs: {
+        Row: {
+          created_at: string
+          finished_at: string | null
+          id: string
+          logs: string | null
+          playbook_name: string
+          started_by: string
+          status: string
+          target_hosts: string[]
+        }
+        Insert: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          logs?: string | null
+          playbook_name: string
+          started_by: string
+          status?: string
+          target_hosts?: string[]
+        }
+        Update: {
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          logs?: string | null
+          playbook_name?: string
+          started_by?: string
+          status?: string
+          target_hosts?: string[]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
